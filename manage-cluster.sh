@@ -15,10 +15,7 @@ print_help() {
 cmd=$1
 error=""
 if [[ $cmd == -* ]] || [[ -z $cmd ]]; then
-    if [[ $cmd == "-h" ]]; then
-        print_help
-    fi
-
+    if [[ $cmd == "-h" ]]; then print_help; fi
     error="Must provide command create or delete!"
 elif [[ $cmd != "create" ]] && [[ $cmd != "delete" ]]; then
     error="Provided unrecognized command $cmd"

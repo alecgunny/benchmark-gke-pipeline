@@ -58,19 +58,13 @@ while getopts "c:p:z:r:b:k:i:s:tdf" opt; do
 done
 shift $((OPTIND -1))
 
+: ${project:?Must specify GCP project name}
 
 if [[ ! -z $trt ]]; then
-    if [[ -z $cluster ]]; then
-        echo "Must specify cluster for TensorRT conversion"
-        exit 1
-    elif [[ -z $project ]]; then
-        echo "Must specify project for TensorRT conversion"
-        exit 1
-    elif [[ -z $zone ]]; then
-        echo "Must specify zone for TensorRT conversion"
-        exit 1
-    fi
+    : ${cluster:?Must specify cluster name for TensorRT conversion}
+    : ${zone:?Must specify GCP zone for TensorRT conversion}
 
+    # create the node pool for the TRT converter app
     ./manage-node-pool.sh create \
         -n trt-converter-pool \
         -c ${cluster} \
@@ -81,31 +75,50 @@ if [[ ! -z $trt ]]; then
         -v 4 \
         -l trtconverter=true
 
+    # deploy the app and wait for it to be ready
     kubectl apply -f apps/trt-converter/deploy.yaml
     kubectl rollout status deployment/trt-converter
 
+    # get the IP of the load balancer ingress to make requests
     ip=$(kubectl get service trt-converter -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-    platform="trt:${ip}"
+
+    # attach it to the platform so our export script knows
+    # not to try to perform a local conversion, include
+    # the fp16 flag (or its absence) here
+    platform="trt:${ip} ${use_fp16}"
 else
     platform="onnx"
 fi
 
+# make the repo if it doesn't exist. If it does,
+# delete all the contents first so we can start fresh
 if [[ ! -d $repo ]]; then mkdir -p ${repo}; fi
 if [[ ! -z $(ls $repo) ]]; then rm -rf ${repo}/*; fi
 
+# run the export script
 python export.py \
     --count ${instances} \
     --platform ${platform} \
-    --kernel-stride ${kernel_stride} \
-    ${use_fp16}
+    --kernel-stride ${kernel_stride}
 
-gsutil cp ${repo}/* gs://${bucket}
+# create the specified bucket if it doesn't exist
+exists=$(gsutil ls -p ${project} gs:// | grep gs://${bucket})
+if [[ -z $exists ]]; then
+    gsutil mb -p ${project} gs://${bucket}
+fi
+
+# copy all the repo contents to the bucket
+gsutil cp -p ${project} ${repo}/* gs://${bucket}
+
+# delete the local contents if we set the -d flag
 if [[ ! -z $delete ]]; then
     rm -rf ${repo}
 fi
 
+# delete the converter node pool now that
+# we're done with it. In production, you
+# probably wouldn't want to do this
 if [[ ! -z $trt ]]; then
-    ./manage-node-pool.sh \
-        -m delete -c ${cluster} -p ${project}
+    ./manage-node-pool.sh delete \
+        -n trt-converter-pool -c ${cluster} -p ${project} -z ${zone}
 fi
-

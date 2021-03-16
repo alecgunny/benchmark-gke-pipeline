@@ -1,12 +1,29 @@
 #! /bin/bash -e
 
+print_help() {
+    echo "Create or delete a GKE cluster"
+    echo "Usage: ./manage-cluster.sh CMD [options]"
+    echo "CMD: either create or delete"
+    echo "Options:"
+    echo "--------"
+    echo "    -n: nodepool name"
+    echo "    -c: cluster name"
+    echo "    -p: project name"
+    echo "    -z: zone to create node pool in"
+    echo "    -g: number of T4s to attach to nodes on nodepool. Only necessary in create mode"
+    echo "    -N: number of nodes to add to nodepool. Only necessary in create mode"
+    echo "    -v: number of vCPUs to attach to nodes on nodepool. Only necessary in create mode"
+    echo "    -l: optional labels to provide to node pool creation"
+    exit 0
+}
+
 cmd=$1
+error=""
 if [[ $cmd == -* ]] || [[ -z $cmd ]]; then
-    echo "Must provide command create or delete!"
-    exit 1
+    if [[ $cmd == "-h" ]]; then print_help; fi
+    error="Must provide command create or delete!"
 elif [[ $cmd != "create" ]] && [[ $cmd != "delete" ]]; then
-    echo "Provided unrecognized command $cmd"
-    exit 1
+    error="Provided unrecognized command $cmd"
 fi
 shift
 
@@ -37,20 +54,7 @@ while getopts "n:c:p:z:g:N:v:l:h" opt; do
             labels="--node-labels=${OPTARG}"
             ;;
         h )
-            echo "Create or delete a GKE cluster"
-            echo "Usage: ./manage-cluster.sh CMD [options]"
-            echo "CMD: either create or delete"
-            echo "Options:"
-            echo "--------"
-            echo "    -n: nodepool name"
-            echo "    -c: cluster name"
-            echo "    -p: project name"
-            echo "    -z: zone to create node pool in"
-            echo "    -g: number of T4s to attach to nodes on nodepool. Only necessary in create mode"
-            echo "    -N: number of nodes to add to nodepool. Only necessary in create mode"
-            echo "    -v: number of vCPUs to attach to nodes on nodepool. Only necessary in create mode"
-            echo "    -l: optional labels to provide to node pool creation"
-            exit 0
+            print_help
             ;;
         \? )
             echo "Unrecognized argument ${opt}"
@@ -58,6 +62,11 @@ while getopts "n:c:p:z:g:N:v:l:h" opt; do
     esac
 done
 shift $((OPTIND -1))
+
+if [[ ! -z $error ]]; then
+    echo $error
+    exit 1
+fi
 
 : ${nodepool:?Must specify nodepool name}
 : ${cluster:?Must specify cluster name}
