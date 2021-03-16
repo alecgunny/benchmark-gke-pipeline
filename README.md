@@ -33,7 +33,12 @@ PROJECT=<your GCP project name>
 ```
 
 ### Export
-Start by exporting models to a GCS bucket. If you only ever plan on leveraging a single kernel stride, you'll only need to do this once.
+Before we export, be sure to activate the export conda environment
+```
+conda activate gwe2e-export
+```
+
+Now exporting the relevant models locally then ship them to a GCS bucket. If you only ever plan on leveraging a single kernel stride, you'll only need to do this once up front.
 ```
 KERNEL_STRIDE=0.002
 LOCAL_REPO_NAME=./repo
@@ -49,3 +54,17 @@ BUCKET_NAME=gw-benchmarking_model-repo
     -k $KERNEL_STRIDE -i 1 -s 1 \
     -t -f -d
 ```
+
+
+### Start the Triton Server
+Create a T4 node pool then deploy the Triton server container on to it, pointing it at our export bucket.
+```
+NUM_GPUS=2
+NUM_VCPUS=32
+NUM_NODES=1
+./start-server.sh -c $CLUSTER_NAME -z $ZONE -p $PROJECT \
+    -b $BUCKET_NAME -g $NUM_GPUS -v $NUM_VCPUS -N 1
+```
+
+### Deploy the client nodes and run experiment
+This is the part that needs completing.
