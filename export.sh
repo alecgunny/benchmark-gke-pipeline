@@ -92,8 +92,8 @@ fi
 
 # make the repo if it doesn't exist. If it does,
 # delete all the contents first so we can start fresh
-if [[ ! -d $repo ]]; then mkdir -p ${repo}; fi
-if [[ ! -z $(ls $repo) ]]; then rm -rf ${repo}/*; fi
+[[ -d $repo ]] || mkdir -p ${repo}
+[[ -z $(ls $repo) ]] || rm -rf ${repo}/*
 
 # run the export script
 python export.py \
@@ -102,23 +102,17 @@ python export.py \
     --kernel-stride ${kernel_stride}
 
 # create the specified bucket if it doesn't exist
-exists=$(gsutil ls -p ${project} gs:// | grep gs://${bucket})
-if [[ -z $exists ]]; then
+[[ -z $(gsutil ls -p ${project} gs:// | grep gs://${bucket}) ]] || \
     gsutil mb -p ${project} gs://${bucket}
-fi
 
 # copy all the repo contents to the bucket
 gsutil cp -p ${project} ${repo}/* gs://${bucket}
 
 # delete the local contents if we set the -d flag
-if [[ ! -z $delete ]]; then
-    rm -rf ${repo}
-fi
+[[ -z $delete ]] || rm -rf ${repo}
 
 # delete the converter node pool now that
 # we're done with it. In production, you
 # probably wouldn't want to do this
-if [[ ! -z $trt ]]; then
-    ./manage-node-pool.sh delete \
-        -n trt-converter-pool -c ${cluster} -p ${project} -z ${zone}
-fi
+[[ -z $trt ]] || ./manage-node-pool.sh delete \
+    -n trt-converter-pool -c ${cluster} -p ${project} -z ${zone}
