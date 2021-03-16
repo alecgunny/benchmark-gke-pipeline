@@ -68,6 +68,7 @@ elif [[ $mode == "create" ]]; then
         --cluster=${cluster} \
         --project=${project} \
         --zone=${zone} \
+        --num-nodes=${nodes} \
         --machine-type=n1-standard-${vcpus} \
         --accelerator=type=nvidia-tesla-t4,count=${gpus}
 elif [[ $mode == "delete" ]]; then
