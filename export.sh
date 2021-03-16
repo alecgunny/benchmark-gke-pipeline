@@ -71,15 +71,15 @@ if [[ ! -z $trt ]]; then
         exit 1
     fi
 
-    ./manage-node-pool.sh \
-        -m create \
+    ./manage-node-pool.sh create \
         -n trt-converter-pool \
         -c ${cluster} \
         -p ${project} \
         -z ${zone} \
         -g 1 \
         -N 1 \
-        -v 4
+        -v 4 \
+        -l trtconverter=true
 
     kubectl apply -f apps/trt-converter/deploy.yaml
     kubectl rollout status deployment/trt-converter

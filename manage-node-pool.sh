@@ -1,6 +1,16 @@
 #! /bin/bash -e
 
-while getopts "n:c:p:z:m:g:N:v:h" opt; do
+cmd=$1
+if [[ $cmd == -* ]] || [[ -z $cmd ]]; then
+    echo "Must provide command create or delete!"
+    exit 1
+elif [[ $cmd != "create" ]] && [[ $cmd != "delete" ]]; then
+    echo "Provided unrecognized command $cmd"
+    exit 1
+fi
+shift
+
+while getopts "n:c:p:z:g:N:v:l:h" opt; do
     case ${opt} in
         n )
             nodepool=${OPTARG}
@@ -14,30 +24,32 @@ while getopts "n:c:p:z:m:g:N:v:h" opt; do
         z )
             zone=${OPTARG}
             ;;
-        m )
-            mode=${OPTARG}
-            ;;
         g )
             gpus=${OPTARG}
             ;;
-        N)
+        N )
             nodes=${OPTARG}
             ;;
-        v)
+        v )
             vcpus=${OPTARG}
+            ;;
+        l )
+            labels="--node-labels=${OPTARG}"
             ;;
         h )
             echo "Create or delete a GKE cluster"
+            echo "Usage: ./manage-cluster.sh CMD [options]"
+            echo "CMD: either create or delete"
             echo "Options:"
             echo "--------"
             echo "    -n: nodepool name"
             echo "    -c: cluster name"
             echo "    -p: project name"
             echo "    -z: zone to create node pool in"
-            echo "    -m: mode, either create or delete"
-            echo "    -g: number of T4s to attach to nodes on nodepool"
-            echo "    -N: number of nodes to add to nodepool"
-            echo "    -v: number of vCPUs to attach to nodes on nodepool"
+            echo "    -g: number of T4s to attach to nodes on nodepool. Only necessary in create mode"
+            echo "    -N: number of nodes to add to nodepool. Only necessary in create mode"
+            echo "    -v: number of vCPUs to attach to nodes on nodepool. Only necessary in create mode"
+            echo "    -l: optional labels to provide to node pool creation"
             exit 0
             ;;
         \? )
@@ -47,37 +59,27 @@ while getopts "n:c:p:z:m:g:N:v:h" opt; do
 done
 shift $((OPTIND -1))
 
-if [[ -z $nodepool ]]; then
-    echo "Must specify a name for nodepool"
-    exit 1
-elif [[ -z $cluster ]]; then
-    echo "Must specify a cluster to deploy nodepool ${nodepool} on"
-    exit 1
-elif [[ -z $project ]]; then
-    echo "Must specify a project for nodepool ${nodepool}"
-    exit 1
-elif [[ -z $zone ]]; then
-    echo "Must specify a zone for nodepool ${nodepool}"
-fi
+: ${nodepool:?Must specify nodepool name}
+: ${cluster:?Must specify cluster name}
+: ${zone:?Must specify zone}
+: ${project:?Must specify project}
 
-if [[ -z $mode ]]; then
-    echo "No mode specified!"
-    exit 1
-elif [[ $mode == "create" ]]; then
+if [[ $cmd == "create" ]]; then
+    : ${gpus:?Must specify number of gpus to attach to nodes}
+    : ${vcpus:?Must specify number of vcpus to attach to nodes}
+    : ${nodes:?Must specify number of nodes to create in node pool}
+
     gcloud container node-pools create ${nodepool} \
         --cluster=${cluster} \
         --project=${project} \
         --zone=${zone} \
         --num-nodes=${nodes} \
         --machine-type=n1-standard-${vcpus} \
-        --accelerator=type=nvidia-tesla-t4,count=${gpus}
-elif [[ $mode == "delete" ]]; then
+        --accelerator=type=nvidia-tesla-t4,count=${gpus} \
+        ${labels}
+elif [[ $cmd == "delete" ]]; then
     gcloud container node-pools delete ${nodepool} \
         --cluster=${cluster} \
         --project=${project} \
         --zone=${zone}
-else
-    echo "Unrecognized mode ${mode}"
-    exit 1
 fi
-
