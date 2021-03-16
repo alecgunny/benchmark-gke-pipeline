@@ -84,7 +84,7 @@ if [[ ! -z $trt ]]; then
     kubectl apply -f apps/trt-converter/deploy.yaml
     kubectl rollout status deployment/trt-converter
 
-    ip=$(kubectl describe services/trt-converter | FILL ME OUT)
+    ip=$(kubectl get service trt-converter -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
     platform="trt:${ip}"
 else
     platform="onnx"

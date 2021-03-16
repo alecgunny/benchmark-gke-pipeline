@@ -1,12 +1,27 @@
 #! /bin/bash -e
 
+print_help() {
+    echo "Create or delete a GKE cluster"
+    echo "Usage: ./manage-cluster.sh CMD [options]"
+    echo "CMD: either create or delete"
+    echo "Options:"
+    echo "--------"
+    echo "    -c: cluster name"
+    echo "    -z: zone"
+    echo "    -p: GCP project name"
+    exit 0
+}
+
 cmd=$1
+error=""
 if [[ $cmd == -* ]] || [[ -z $cmd ]]; then
-    echo "Must provide command create or delete!"
-    exit 1
+    if [[ $cmd == "-h" ]]; then
+        print_help
+    fi
+
+    error="Must provide command create or delete!"
 elif [[ $cmd != "create" ]] && [[ $cmd != "delete" ]]; then
-    echo "Provided unrecognized command $cmd"
-    exit 1
+    error="Provided unrecognized command $cmd"
 fi
 shift
 
@@ -22,15 +37,7 @@ while getopts "c:z:p:h" opt; do
             project=${OPTARG}
             ;;
         h )
-            echo "Create or delete a GKE cluster"
-            echo "Usage: ./manage-cluster.sh CMD [options]"
-            echo "CMD: either create or delete"
-            echo "Options:"
-            echo "--------"
-            echo "    -c: cluster name"
-            echo "    -z: zone"
-            echo "    -p: GCP project name"
-            exit 0
+            print_help
             ;;
         \? )
             echo "Unrecognized argument ${opt}"
@@ -39,6 +46,11 @@ while getopts "c:z:p:h" opt; do
     esac
 done
 shift $((OPTIND -1))
+
+if [[ ! -z $error ]]; then
+    echo $error
+    exit 1
+fi
 
 : ${cluster:?Must specify cluster name}
 : ${zone:?Must specify zone}
@@ -49,6 +61,9 @@ if [[ $cmd == "create" ]]; then
 
     # add cluster credentials to k8s config
     gcloud container clusters get-credentials ${cluster} --project=${project} --zone=${zone}
+
+    # deploy gpu driver daemonset
+    kubectl apply -f https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/nvidia-driver-installer/cos/daemonset-preloaded.yaml
 elif [[ $cmd == "delete" ]]; then
     gcloud container clusters delete ${cluster} --zone=${zone} --project=${project}
 
