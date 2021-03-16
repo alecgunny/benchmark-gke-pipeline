@@ -1,12 +1,15 @@
 #! /bin/bash -e
 
-while getopts ":c:p:r:b:k:i:stdf" opt; do
+while getopts "c:p:z:r:b:k:i:s:tdf" opt; do
     case ${opt} in
         c )
             cluster=${OPTARG}
             ;;
         p )
             project=${OPTARG}
+            ;;
+        z )
+            zone=${OPTARG}
             ;;
         r )
             repo=${OPTARG}
@@ -37,6 +40,7 @@ while getopts ":c:p:r:b:k:i:stdf" opt; do
             echo "--------"
             echo "    -c: cluster name for deploying TensorRT conversion app"
             echo "    -p: project name for deploying TensorRT conversion app"
+            echo "    -z: zone for deploying TensorRT conversion app"
             echo "    -r: local repository to save exported models to"
             echo "    -b: GCP bucket to which to host models after export"
             echo "    -k: kernel stride"
@@ -62,6 +66,9 @@ if [[ ! -z $trt ]]; then
     elif [[ -z $project ]]; then
         echo "Must specify project for TensorRT conversion"
         exit 1
+    elif [[ -z $zone ]]; then
+        echo "Must specify zone for TensorRT conversion"
+        exit 1
     fi
 
     ./manage-node-pool.sh \
@@ -69,6 +76,7 @@ if [[ ! -z $trt ]]; then
         -n trt-converter-pool \
         -c ${cluster} \
         -p ${project} \
+        -z ${zone} \
         -g 1 \
         -N 1 \
         -v 4
@@ -100,3 +108,4 @@ if [[ ! -z $trt ]]; then
     ./manage-node-pool.sh \
         -m delete -c ${cluster} -p ${project}
 fi
+
