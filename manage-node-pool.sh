@@ -1,6 +1,6 @@
 #! /bin/bash -e
 
-while getopts ":n:c:p:m:g:N:v" opt; do
+while getopts "n:c:p:z:m:g:N:v:h" opt; do
     case ${opt} in
         n )
             nodepool=${OPTARG}
@@ -10,6 +10,9 @@ while getopts ":n:c:p:m:g:N:v" opt; do
             ;;
         p )
             project=${OPTARG}
+            ;;
+        z )
+            zone=${OPTARG}
             ;;
         m )
             mode=${OPTARG}
@@ -30,6 +33,7 @@ while getopts ":n:c:p:m:g:N:v" opt; do
             echo "    -n: nodepool name"
             echo "    -c: cluster name"
             echo "    -p: project name"
+            echo "    -z: zone to create node pool in"
             echo "    -m: mode, either create or delete"
             echo "    -g: number of T4s to attach to nodes on nodepool"
             echo "    -N: number of nodes to add to nodepool"
@@ -46,32 +50,33 @@ shift $((OPTIND -1))
 if [[ -z $nodepool ]]; then
     echo "Must specify a name for nodepool"
     exit 1
-fi
-
-if [[ -z $cluster ]]; then
+elif [[ -z $cluster ]]; then
     echo "Must specify a cluster to deploy nodepool ${nodepool} on"
     exit 1
-fi
-
-if [[ -z $project ]]; then
+elif [[ -z $project ]]; then
     echo "Must specify a project for nodepool ${nodepool}"
     exit 1
+elif [[ -z $zone ]]; then
+    echo "Must specify a zone for nodepool ${nodepool}"
 fi
 
 if [[ -z $mode ]]; then
     echo "No mode specified!"
     exit 1
 elif [[ $mode == "create" ]]; then
-    gcloud container nodepool create ${nodepool} \
+    gcloud container node-pools create ${nodepool} \
         --cluster=${cluster} \
         --project=${project} \
+        --zone=${zone} \
         --machine-type=n1-standard-${vcpus} \
         --accelerator=type=nvidia-tesla-t4,count=${gpus}
 elif [[ $mode == "delete" ]]; then
-    gcloud container nodepool delete ${nodepool} \
+    gcloud container node-pools delete ${nodepool} \
         --cluster=${cluster} \
-        --project=${project}
+        --project=${project} \
+        --zone=${zone}
 else
     echo "Unrecognized mode ${mode}"
     exit 1
 fi
+
