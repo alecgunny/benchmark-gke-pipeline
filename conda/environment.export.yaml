@@ -1,0 +1,20 @@
+name: gwe2e-export
+channels:
+  - conda-forge
+  - pytorch
+dependencies:
+  - python=3.8
+  - bokeh
+  - numpy
+  - pandas
+  - scipy
+  - scikit-learn
+  - pytorch=1.7.0
+  - cpuonly
+  - tensorflow=2.3.0
+  - seaborn
+  - attrs
+  - gwpy
+  - pip
+  - pip:
+    - -r requirements.txt
