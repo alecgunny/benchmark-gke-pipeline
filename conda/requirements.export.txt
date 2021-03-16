@@ -3,4 +3,4 @@ tritonclient[all]
 
 git+https://git.ligo.org/alec.gunny/deepclean-prod.git@tsinfer
 git+https://git.ligo.org/tri.nguyen/bbh_detection_ml.git
-git+https://github.com/alecgunnny/exportlib@20.11
+git+https://github.com/alecgunny/exportlib@20.11

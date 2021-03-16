@@ -17,4 +17,4 @@ dependencies:
   - gwpy
   - pip
   - pip:
-    - -r requirements.txt
+    - -r requirements.export.txt
