@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trt-converter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: trt-converter
+  template:
+    metadata:
+      labels:
+        app: trt-converter
+    spec:
+      containers:
+      - name: trt-converter
+        image: alecgunny/trt-converter-app:20.11
+        env:
+        - name: EXTRA_NV_PATHS
+          value: /usr/local/nvidia/lib64:/usr/local/nvidia/bin
+        command:
+        - /bin/bash
+        args:
+        - -c
+        - LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$EXTRA_NV_PATHS" flask run --host=0.0.0.0
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+        ports:
+        - containerPort: 5000
+      nodeSelector:
+        cloud.google.com/gke-accelerator: nvidia-tesla-t4
+        trtconverter: "true"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: trt-converter
+  namespace: default
+spec:
+  ports:
+  - name: http-flask
+    port: 5000
+    protocol: TCP
+  selector:
+    app: trt-converter
+  sessionAffinity: None
+  type: LoadBalancer

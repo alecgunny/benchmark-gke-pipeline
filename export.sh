@@ -73,10 +73,10 @@ if [[ ! -z $trt ]]; then
         -N 1 \
         -v 4
 
-    kubectl apply -f apps/trt-conversion-app/deploy.yaml
-    kubectl rollout status deployment/trt-conversion-app
+    kubectl apply -f apps/trt-converter/deploy.yaml
+    kubectl rollout status deployment/trt-converter
 
-    ip=$(kubectl describe services/trt-conversion-app | FILL ME OUT)
+    ip=$(kubectl describe services/trt-converter | FILL ME OUT)
     platform="trt:${ip}"
 else
     platform="onnx"
