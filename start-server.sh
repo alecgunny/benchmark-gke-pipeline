@@ -43,15 +43,15 @@ while getopts "c:p:z:b:g:v:N:h" opt; do
 done
 shift $((OPTIND -1))
 
-./manage-node-pool create \
+./manage-node-pool.sh create \
         -n tritonserver-pool \
         -c ${cluster} \
         -p ${project} \
         -z ${zone} \
         -g ${gpus} \
         -N ${nodes} \
-        -v ${vcpus}
+        -v ${vcpus} || echo "Triton node pool already created" 2>/dev/null
 
 python format_yaml.py apps/triton-server/deploy.yaml \
-    --gpus $gpus --vcpus $vcpus --repo $bucket | kubectl apply -
+    --gpus $gpus --vcpus $(($vcpus - 1)) --repo $bucket | kubectl apply -f -
 kubectl rollout status deployment/tritonserver

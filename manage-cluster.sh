@@ -62,7 +62,8 @@ if [[ $cmd == "create" ]]; then
     # deploy gpu driver daemonset
     kubectl apply -f https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/nvidia-driver-installer/cos/daemonset-preloaded.yaml
 elif [[ $cmd == "delete" ]]; then
-    gcloud container clusters delete ${cluster} --zone=${zone} --project=${project}
+    gcloud container clusters delete ${cluster} \
+        --quiet --zone=${zone} --project=${project}
 
     # also remove cluster credentials from kube config
     kubename=gke_${project}_${zone}_${cluster}

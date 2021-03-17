@@ -8,6 +8,7 @@ spec:
   selector:
     matchLabels:
       app: tritonserver
+  progressDeadlineSeconds: 100
   template:
     metadata:
       labels:
@@ -52,7 +53,6 @@ spec:
           httpGet:
             path: /v2/health/ready
             port: http
-      progressDeadlineSeconds: 100
       nodeSelector:
         cloud.google.com/gke-accelerator: nvidia-tesla-t4
 ---

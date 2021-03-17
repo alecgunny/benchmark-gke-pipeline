@@ -79,6 +79,7 @@ if [[ $cmd == "create" ]]; then
     : ${nodes:?Must specify number of nodes to create in node pool}
 
     gcloud container node-pools create ${nodepool} \
+        --verbosity=error \
         --cluster=${cluster} \
         --project=${project} \
         --zone=${zone} \
@@ -88,6 +89,7 @@ if [[ $cmd == "create" ]]; then
         ${labels}
 elif [[ $cmd == "delete" ]]; then
     gcloud container node-pools delete ${nodepool} \
+        --quiet \
         --cluster=${cluster} \
         --project=${project} \
         --zone=${zone}

@@ -77,10 +77,10 @@ if [[ ! -z $trt ]]; then
         -g 1 \
         -N 1 \
         -v 4 \
-        -l trtconverter=true | echo "Conversion node pool already created"
+        -l trtconverter=true || echo "Conversion node pool already created"
 
     # deploy the app and wait for it to be ready
-    kubectl apply -f apps/trt-converter/deploy.yaml | "Conversion service already created"
+    kubectl apply -f apps/trt-converter/deploy.yaml || echo "Conversion service already created"
     kubectl rollout status deployment/trt-converter
 
     # get the IP of the load balancer ingress to make requests
@@ -88,7 +88,7 @@ if [[ ! -z $trt ]]; then
 
     # attach it to the platform so our export script knows
     # not to try to perform a local conversion
-    platform="trt_${precision:-fp32}:${ip}"
+    platform="trt_${precision:-fp32}:http://${ip}:5000/onnx"
 else
     platform="onnx"
 fi
@@ -107,11 +107,11 @@ python export.py \
     --streams-per-gpu ${streams:-1}
 
 # create the specified bucket if it doesn't exist
-[[ -z $(gsutil ls -p ${project} gs:// | grep gs://${bucket}) ]] || \
+[[ ! -z $(gsutil ls -p ${project} gs:// | grep gs://${bucket}) ]] || \
     gsutil mb -p ${project} gs://${bucket}
 
 # copy all the repo contents to the bucket
-gsutil cp -p ${project} ${repo}/* gs://${bucket}
+gsutil cp -r ${repo}/* gs://${bucket}
 
 # delete the local contents if we set the -d flag
 [[ -z $delete ]] || rm -rf ${repo}
@@ -119,5 +119,9 @@ gsutil cp -p ${project} ${repo}/* gs://${bucket}
 # delete the converter node pool now that
 # we're done with it. In production, you
 # probably wouldn't want to do this
-[[ -z $trt ]] || ./manage-node-pool.sh delete \
-    -n trt-converter-pool -c ${cluster} -p ${project} -z ${zone}
+if [[ ! -z $trt ]]; then
+    kubectl delete -f apps/trt-converter/deploy.yaml
+    ./manage-node-pool.sh delete \
+        -n trt-converter-pool -c ${cluster} -p ${project} -z ${zone}
+fi
+
