@@ -32,7 +32,7 @@ while getopts "c:p:z:r:b:k:i:s:tdf" opt; do
         d )
             delete=true
             ;;
-        f ) use_fp16="--use-fp16"
+        f ) precision="fp16"
             ;;
         h )
             echo "Create or delete a GKE cluster"
@@ -45,7 +45,7 @@ while getopts "c:p:z:r:b:k:i:s:tdf" opt; do
             echo "    -b: GCP bucket to which to host models after export"
             echo "    -k: kernel stride"
             echo "    -i: number of instances per model per gpu"
-            echo "    -s: streams per node"
+            echo "    -s: streams per gpu"
             echo "    -t: set this flag to convert deepclean models to TensorRT"
             echo "    -d: set this flag to delete local repository after export to GCP"
             echo "    -f: set this flag to use fp16 inference with TensorRT"
@@ -58,9 +58,13 @@ while getopts "c:p:z:r:b:k:i:s:tdf" opt; do
 done
 shift $((OPTIND -1))
 
+# check required args
 : ${project:?Must specify GCP project name}
+: ${repo:?Must specify local export repo}
+: ${kernel_stride:?Must specify kernel stride}
 
 if [[ ! -z $trt ]]; then
+    # check args required for doing TRT export
     : ${cluster:?Must specify cluster name for TensorRT conversion}
     : ${zone:?Must specify GCP zone for TensorRT conversion}
 
@@ -73,19 +77,18 @@ if [[ ! -z $trt ]]; then
         -g 1 \
         -N 1 \
         -v 4 \
-        -l trtconverter=true
+        -l trtconverter=true | echo "Conversion node pool already created"
 
     # deploy the app and wait for it to be ready
-    kubectl apply -f apps/trt-converter/deploy.yaml
+    kubectl apply -f apps/trt-converter/deploy.yaml | "Conversion service already created"
     kubectl rollout status deployment/trt-converter
 
     # get the IP of the load balancer ingress to make requests
     ip=$(kubectl get service trt-converter -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 
     # attach it to the platform so our export script knows
-    # not to try to perform a local conversion, include
-    # the fp16 flag (or its absence) here
-    platform="trt:${ip} ${use_fp16}"
+    # not to try to perform a local conversion
+    platform="trt_${precision:-fp32}:${ip}"
 else
     platform="onnx"
 fi
@@ -97,9 +100,11 @@ fi
 
 # run the export script
 python export.py \
-    --count ${instances} \
+    --repo-dir ${repo} \
+    --count ${instances:-1} \
     --platform ${platform} \
-    --kernel-stride ${kernel_stride}
+    --kernel-stride ${kernel_stride} \
+    --streams-per-gpu ${streams:-1}
 
 # create the specified bucket if it doesn't exist
 [[ -z $(gsutil ls -p ${project} gs:// | grep gs://${bucket}) ]] || \
