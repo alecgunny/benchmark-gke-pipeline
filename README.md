@@ -7,7 +7,7 @@ These instructions will assume that you have a conda installation on your device
 On your local device, you will manage GKE cluster resources and perform the export of any models as necessary. As such, you will need:
 1. The export conda environment
 ```
-conda env create -f environment.export.yaml
+conda env create -f conda/environment.export.yaml
 ```
 2. The gcloud command line utility, installation instructions [here](https://cloud.google.com/sdk/docs/install). Be sure that you have the appropriate permissions to create and delete clusters and nodepools.
 3. The gsutil command line utility, installation instructions [here](https://cloud.google.com/storage/docs/gsutil_install). Be sure that you have the appropriate permissions to create and delete buckets and blobs.
@@ -16,7 +16,7 @@ conda env create -f environment.export.yaml
 ### Remotely
 Your remote environment will need to have the client conda environment built, either by building locally and exporting as a tar archive or by building there:
 ```
-conda env create -f environment.client.yaml
+conda env create -f conda/environment.client.yaml
 ```
 
 ## Running
