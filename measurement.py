@@ -1,10 +1,11 @@
+import requests
 import time
 import typing
 from threading import Event, Thread
 from queue import Empty, Queue
 
 from collections import defaultdict
-import tritonclient.grpc as triton
+from tritonclient import grpc as triton
 
 
 class ServerInferenceMetric:
@@ -12,15 +13,15 @@ class ServerInferenceMetric:
         self.ns = 0
         self.count = 0
 
-    def update(self, stats):
-        count = stats.count - self.count
-        if count == 0:
+    def update(self, count, ns):
+        update = count - self.count
+        if update == 0:
             return
-        average = count / (stats.ns - self.ns)
+        average = (ns - self.ns) / update
 
-        self.count = stats.count
-        self.ns = stats.ns
-        return average, count
+        self.count = count
+        self.ns = ns
+        return average, update
 
 
 class UnstableQueueException(Exception):
@@ -96,14 +97,15 @@ class ServerStatsMonitor(ThreadedStatWriter):
         monitor: typing.Optional[str] = None,
         limit: typing.Optional[float] = None
     ):
-        self.client = triton.InferenceServerClient(url)
-        model_config = self.client.get_model_config(model_name).config
+        client = triton.InferenceServerClient(url)
+        model_config = client.get_model_config(model_name).config
         if len(model_config.ensemble_scheduling.step) > 0:
             self.models = [
                 i.model_name for i in model_config.ensemble_scheduling.step
             ]
         else:
             self.models = [model_config.name]
+        self.url = "http://" + url.replace("8001", "8002/metrics")
 
         if monitor is not None and limit is None:
             raise ValueError(f"Must set limit for monitoring metric {monitor}")
@@ -127,32 +129,42 @@ class ServerStatsMonitor(ThreadedStatWriter):
         )
 
     def _get_values(self):
-        while (time.time() - self._last_request_time) < (1 / self.qps_limit):
-            time.sleep(1e-6)
-
         values = []
+        content = requests.get(self.url).content.decode("utf-8").split("\n")
         for model in self.models:
-            model_stats = self.client.get_inference_statistics(
-                model
-            ).model_stats[0].inference_stats
+            model_stats = [i for i in content if f'model="{model}",' in i]
+            if len(model_stats) == 0:
+                raise ValueError("couldn't find model in content")
+
+            counts = [
+                float(i.split(" ")[1]) for i in model_stats if i.startswith(
+                    "nv_inference_request_success"
+                )
+            ]
+            count = sum(counts)
 
             model_values = [model]
-            for field, data in model_stats.ListFields():
-                if field.name == "fail":
-                    continue
-
-                data = self.stats[model][field.name].update(data)
+            for process in self.columns[1:-1]:
+                field = process if process != "success" else "request"
+                process_times = [
+                    float(i.split(" ")[1]) for i in model_stats if i.startswith(
+                        f"nv_inference_{field}_duration_us"
+                    )
+                ]
+                ns = sum(process_times)
+                data = self.stats[model][process].update(count, ns)
                 if data is None:
                     return
-                t, count = data
+
+                t, diff = data
                 model_values.append(t)
 
-                if model in self.monitor and field.name == "queue":
+                if model in self.monitor and process == "queue":
                     if t > self.limit:
-                        raise UnstableQueueException
                         self._error_q.put(t)
+                        raise UnstableQueueException
 
-            model_values.append(count)
+            model_values.append(diff)
             values.append(model_values)
 
         self._last_request_time = time.time()
@@ -171,7 +183,7 @@ class ClientStatsMonitor(ThreadedStatWriter):
 
         super().__init__(
             output_file,
-            columns=["message_start", "request_send", "request_return"]
+            columns=["message_start", "data_syncd", "request_send", "request_return"]
         )
 
     def _get_values(self):
