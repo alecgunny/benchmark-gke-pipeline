@@ -57,10 +57,10 @@ def main(
         "server.csv", url, model_name, monitor="snapshotter", limit=10**6
     )
 
-    client_stats_monitor.start()
-    server_stats_monitor.start()
-
     with Pipeline(processes, out_pipes) as pipeline:
+        client_stats_monitor.start()
+        server_stats_monitor.start()
+
         packages_recvd = 0
 
         log.info(
@@ -118,25 +118,19 @@ def main(
                     break
                 continue
             last_package_time = time.time()
+            packages_recvd += 1
 
-            new_latency = client_stats_monitor.latency
-            if new_latency:
-                latency = new_latency
-            new_throughput = client_stats_monitor.throughput
-            if new_throughput:
-                throughput = new_throughput
-            new_request_rate = client_stats_monitor.request_rate
-            if new_request_rate:
-                request_rate = new_request_rate
+            latency = client_stats_monitor.latency or latency
+            throughput = client_stats_monitor.throughput or throughput
+            request_rate = client_stats_monitor.request_rate or request_rate
 
             msg = f"Average latency: {latency} us, "
-            msg += f"Average throughput: {throughput:0.1f} frames /s, "
+            msg += f"Average throughput: {throughput:0.1f} frames / s, "
             msg += f"Average request rate: {request_rate:0.1f} frames / s"
+
             max_msg_length = max(max_msg_length, len(msg))
             msg += " " * (max_msg_length - len(msg))
-
             print(msg, end="\r", flush=True)
-            packages_recvd += 1
 
     print("\n")
     log.info(msg)

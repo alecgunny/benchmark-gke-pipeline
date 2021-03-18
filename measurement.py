@@ -119,7 +119,6 @@ class ServerStatsMonitor(ThreadedStatWriter):
 
         self.stats = defaultdict(lambda: defaultdict(ServerInferenceMetric))
         self.qps_limit = qps_limit
-        self._last_request_time = time.time()
 
         processes = [
             "success", "queue", "compute_input", "compute_infer", "compute_output"
@@ -127,6 +126,9 @@ class ServerStatsMonitor(ThreadedStatWriter):
         super().__init__(
             output_file, columns=["model"] + processes + ["count"]
         )
+
+        # initialize metrics
+        _ = self._get_values()
 
     def _get_values(self):
         values = []
@@ -167,7 +169,6 @@ class ServerStatsMonitor(ThreadedStatWriter):
             model_values.append(diff)
             values.append(model_values)
 
-        self._last_request_time = time.time()
         return values
 
 
