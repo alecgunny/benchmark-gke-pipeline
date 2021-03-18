@@ -34,6 +34,7 @@ class Pipeline:
                 is_alive = process.is_alive()
             except ValueError:
                 continue
+
             if is_alive:
                 process.stop()
                 process.join(0.5)
@@ -44,11 +45,12 @@ class Pipeline:
                 process.terminate()
                 time.sleep(0.1)
                 process.close()
-                print(f"Process {process.name} couldn't join")
+                log.warn(f"Process {process.name} couldn't join")
 
-    def get(self, timeout=None):
+    def get(self, pipes=None, timeout=None):
+        pipes = pipes or self.out_pipes
         try:
-            package = sync_recv(self.out_pipes, timeout=timeout)
+            package = sync_recv(pipes, timeout=timeout)
         except Exception:
             self.cleanup()
             raise

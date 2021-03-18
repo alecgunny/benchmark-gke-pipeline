@@ -61,6 +61,7 @@ class ThreadedStatWriter(Thread):
             return None
 
     def write_row(self, values):
+        values = list(map(str, values))
         if len(values) != len(self.columns):
             raise ValueError(
                 "Can't write values {} with length {}, "
@@ -68,7 +69,7 @@ class ThreadedStatWriter(Thread):
                     ", ".join(values), len(values), len(self.columns)
                 )
             )
-        self.f.write("\n" + ",".join(map(str, values)))
+        self.f.write("\n" + ",".join(values))
 
     def run(self):
         with open(self.output_file, "w") as self.f:
@@ -160,7 +161,7 @@ class ServerStatsMonitor(ThreadedStatWriter):
     def _get_values(self):
         response = requests.get(self.url)
         new_time = time.time()
-        interval = self._last_time - new_time
+        interval = new_time - self._last_time
         self._last_time = time.time()
 
         content = response.content.decode("utf-8").split("\n")
@@ -184,7 +185,7 @@ class ServerStatsMonitor(ThreadedStatWriter):
             count = sum(counts)
 
             model_values = []
-            for process in self.columns[1:-1]:
+            for process in self.columns[:5]:
                 field = process if process != "success" else "request"
                 process_times = list(map(
                     self._get_row_value,

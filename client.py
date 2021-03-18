@@ -45,6 +45,7 @@ def main(
                     list(client._inputs.values()),
                     str(model_version)
                 )
+
         for input_name, input in client.inputs.items():
             data_gen = DummyDataGenerator(
                 input.shape()[1:],
@@ -84,16 +85,45 @@ def main(
         max_msg_length = len(msg)
         latency, throughput, request_rate = 0, 0, 0
         while packages_recvd < num_iterations:
-            try:
-                package = pipeline.get(timeout=5)
-            except RuntimeError as e:
-                if str(e).startswith("Server"):
-                    print("\n")
-                    msg = str(e).split(": ", maxsplit=1)[1]
-                    log.error(f"Encountered server error {msg}")
-                    log.error(f"Breaking after {packages_recvd} steps")
+            error = None
+            for i in range(num_clients):
+                pipes = {}
+                for output in client.outputs:
+                    name = "{}_{}".format(output.name(), sequence_id + i)
+                    pipes[name] = output_pipes[name]
+
+                try:
+                    package = pipeline.get(pipes, timeout=5)
+                except RuntimeError as e:
+                    error = e
                     break
 
+                if package is not None:
+                    last_package_time = time.time()
+                    packages_recvd += 1
+                elif time.time() - last_package_time > 20:
+                    error = "timeout"
+                    break
+
+            # check if we had any issues
+            if error is not None and str(error).startswith("Server"):
+                print("\n")
+                msg = str(e).split(": ", maxsplit=1)[1]
+                log.error(f"Encountered server error {msg}")
+                log.error(f"Breaking after {packages_recvd} steps")
+                break
+            elif error == "timeout":
+                print("\n")
+                error = "timeout"
+                log.error(
+                    f"Timed out, breaking after {packages_recvd} steps"
+                )
+                break
+            elif error is not None:
+                print("\n")
+                raise RuntimeError(str(error))
+
+            # check to make sure our monitors are going ok
             client_monitor_error = client_stats_monitor.error
             if client_monitor_error is not None:
                 print("\n")
@@ -122,17 +152,7 @@ def main(
                         )
                     )
 
-            if package is None:
-                if time.time() - last_package_time > 20:
-                    print("\n")
-                    log.error(
-                        f"Timed out, breaking after {packages_recvd} steps"
-                    )
-                    break
-                continue
-            last_package_time = time.time()
-            packages_recvd += 1
-
+            # update some of our metrics
             latency = client_stats_monitor.latency or latency
             throughput = client_stats_monitor.throughput or throughput
             request_rate = client_stats_monitor.request_rate or request_rate
