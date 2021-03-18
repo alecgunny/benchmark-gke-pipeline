@@ -1,11 +1,13 @@
 import requests
-import time
 import typing
 from threading import Event, Thread
 from queue import Empty, Queue
 
 from collections import defaultdict
 from tritonclient import grpc as triton
+
+if typing.TYPE_CHECKING:
+    from stillwater.client import StreamingInferenceClient
 
 
 class ServerInferenceMetric:
@@ -173,9 +175,14 @@ class ServerStatsMonitor(ThreadedStatWriter):
 
 
 class ClientStatsMonitor(ThreadedStatWriter):
-    def __init__(self, output_file: str, q: Queue):
-        self.q = q
+    def __init__(
+        self,
+        output_file: str,
+        clients: typing.List[StreamingInferenceClient]
+    ):
+        self.qs = {client.name: client._metric_q for client in clients}
         self.n = 0
+
         self._latency = 0
 
         self._throughput_q = Queue()
@@ -184,29 +191,41 @@ class ClientStatsMonitor(ThreadedStatWriter):
 
         super().__init__(
             output_file,
-            columns=["message_start", "data_syncd", "request_send", "request_return"]
+            columns=[
+                "client_id",
+                "message_start",
+                "data_syncd",
+                "request_send",
+                "request_return"
+            ]
         )
 
     def _get_values(self):
-        try:
-            measurements = self.q.get_nowait()
-        except Empty:
+        values = []
+        for client_id, q in self.qs.items():
+            try:
+                measurements = q.get_nowait()
+            except Empty:
+                continue
+
+            if measurements[0] == "start_time":
+                self.start_time = measurements[1]
+                return
+
+            measurements = [i - self.start_time for i in measurements]
+            self.n += 1
+            latency = measurements[-1] - measurements[0]
+            self._latency += (latency - self._latency) / self.n
+
+            values.append([client_id] + measurements)
+
+        if len(values) == 0:
             return
 
-        if measurements[0] == "start_time":
-            self.start_time = measurements[1]
-            return
-
-        measurements = [i - self.start_time for i in measurements]
-        self.n += 1
         self._throughput_q.put(self.n / measurements[-1])
         self._request_rate_q.put(self.n / measurements[1])
-
-        latency = measurements[-1] - measurements[0]
-        self._latency += (latency - self._latency) / self.n
         self._latency_q.put(self._latency)
-
-        return measurements
+        return values
 
     @property
     def latency(self):

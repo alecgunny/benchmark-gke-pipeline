@@ -1,5 +1,6 @@
 import argparse
 import time
+import typing
 
 import numpy as np
 import tritonclient.grpc as triton
@@ -9,41 +10,41 @@ from measurement import ServerStatsMonitor, ClientStatsMonitor
 from client_utils import log, Pipeline
 
 
-def main(
+def make_pipeline(
     url: str,
     model_name: str,
     model_version: int,
     sequence_id: int,
     generation_rate: float,
-    num_iterations: int = 10000
+    warm_up: typing.Optional[int] = None
 ):
     client = StreamingInferenceClient(
         url=url,
         model_name=model_name,
         model_version=model_version,
-        name="client",
+        name=f"client_{sequence_id}",
         sequence_id=sequence_id
     )
 
-    # do a quick warm up
-    warm_up_client = triton.InferenceServerClient(url)
-    for input in client._inputs.values():
-        input.set_data_from_numpy(
-            np.random.randn(*input.shape()).astype("float32")
-        )
-
-    log.info("Warming up with 10 requests")
-    for i in range(10):
-        _ = warm_up_client.infer(
-            model_name,
-            list(client._inputs.values()),
-            str(model_version)
-        )
+    if warm_up is not None:
+        warm_up_client = triton.InferenceServerClient(url)
+        for input in client._inputs.values():
+            input.set_data_from_numpy(
+                np.random.randn(*input.shape()).astype("float32")
+            )
+        for i in range(warm_up):
+            _ = warm_up_client.infer(
+                model_name,
+                list(client._inputs.values()),
+                str(model_version)
+            )
 
     processes = [client]
     for input_name, input in client.inputs.items():
         data_gen = DummyDataGenerator(
-            input.shape()[1:], input_name, generation_rate=generation_rate
+            input.shape()[1:],
+            f"{input_name}_{sequence_id}",
+            generation_rate=generation_rate
         )
         client.add_parent(data_gen)
         processes.append(data_gen)
@@ -51,13 +52,70 @@ def main(
     out_pipes = {}
     for output in client.outputs:
         out_pipes[output.name()] = client.add_child(output.name())
+    return Pipeline(processes, out_pipes)
 
-    client_stats_monitor = ClientStatsMonitor("client.csv", client._metric_q)
+
+def main(
+    url: str,
+    model_name: str,
+    model_version: int,
+    num_clients: int,
+    sequence_id: int,
+    generation_rate: float,
+    num_iterations: int = 10000,
+    warm_up: typing.Optional[int] = None,
+    file_prefix: typing.Optional[str] = None
+):
+    clients, data_generators, output_pipes = [], [], {}
+    for i in range(num_clients):
+        seq_id = sequence_id + i
+        client = StreamingInferenceClient(
+            url=url,
+            model_name=model_name,
+            model_version=model_version,
+            name=f"client_{seq_id}",
+            sequence_id=sequence_id
+        )
+        clients.append(client)
+
+        if i == 0 and warm_up is not None:
+            warm_up_client = triton.InferenceServerClient(url)
+            for input in client._inputs.values():
+                input.set_data_from_numpy(
+                    np.random.randn(*input.shape()).astype("float32")
+                )
+            for i in range(warm_up):
+                _ = warm_up_client.infer(
+                    model_name,
+                    list(client._inputs.values()),
+                    str(model_version)
+                )
+        for input_name, input in client.inputs.items():
+            data_gen = DummyDataGenerator(
+                input.shape()[1:],
+                f"{input_name}_{seq_id}",
+                generation_rate=generation_rate
+            )
+            client.add_parent(data_gen)
+            data_generators.append(data_gen)
+
+        for output in client.outputs:
+            name = "{}_{}".format(output.name(), seq_id)
+            output_pipes[name] = client.add_child(output.name())
+
+    file_prefix = "" if file_prefix is None else (file_prefix + "_")
+    client_stats_monitor = ClientStatsMonitor(
+        f"{file_prefix}client-stats.csv", clients
+    )
     server_stats_monitor = ServerStatsMonitor(
-        "server.csv", url, model_name, monitor="snapshotter", limit=10**6
+        f"{file_prefix}server-stats.csv",
+        url,
+        model_name,
+        monitor="snapshotter",
+        limit=10**6
     )
 
-    with Pipeline(processes, out_pipes) as pipeline:
+    with Pipeline(clients + data_generators, output_pipes) as pipeline:
         client_stats_monitor.start()
         server_stats_monitor.start()
 
@@ -197,6 +255,24 @@ if __name__ == "__main__":
         type=int,
         default=10000,
         help="Number of requests to get for profiling"
+    )
+    runtime_parser.add_argument(
+        "--num-clients",
+        type=int,
+        default=1,
+        help="Number of clients to run simultaneously"
+    )
+    runtime_parser.add_argument(
+        "--warm-up",
+        type=int,
+        default=None,
+        help="Number of warm up requests to make"
+    )
+    runtime_parser.add_argument(
+        "--file_prefix",
+        type=str,
+        default=None,
+        help="Prefix to attach to monitor files"
     )
     flags = parser.parse_args()
     main(**vars(flags))
