@@ -29,7 +29,7 @@ def main(
             model_name=model_name,
             model_version=model_version,
             name=f"client_{seq_id}",
-            sequence_id=sequence_id
+            sequence_id=seq_id
         )
         clients.append(client)
 
