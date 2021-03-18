@@ -10,51 +10,6 @@ from measurement import ServerStatsMonitor, ClientStatsMonitor
 from client_utils import log, Pipeline
 
 
-def make_pipeline(
-    url: str,
-    model_name: str,
-    model_version: int,
-    sequence_id: int,
-    generation_rate: float,
-    warm_up: typing.Optional[int] = None
-):
-    client = StreamingInferenceClient(
-        url=url,
-        model_name=model_name,
-        model_version=model_version,
-        name=f"client_{sequence_id}",
-        sequence_id=sequence_id
-    )
-
-    if warm_up is not None:
-        warm_up_client = triton.InferenceServerClient(url)
-        for input in client._inputs.values():
-            input.set_data_from_numpy(
-                np.random.randn(*input.shape()).astype("float32")
-            )
-        for i in range(warm_up):
-            _ = warm_up_client.infer(
-                model_name,
-                list(client._inputs.values()),
-                str(model_version)
-            )
-
-    processes = [client]
-    for input_name, input in client.inputs.items():
-        data_gen = DummyDataGenerator(
-            input.shape()[1:],
-            f"{input_name}_{sequence_id}",
-            generation_rate=generation_rate
-        )
-        client.add_parent(data_gen)
-        processes.append(data_gen)
-
-    out_pipes = {}
-    for output in client.outputs:
-        out_pipes[output.name()] = client.add_child(output.name())
-    return Pipeline(processes, out_pipes)
-
-
 def main(
     url: str,
     model_name: str,
@@ -96,7 +51,7 @@ def main(
                 f"{input_name}_{seq_id}",
                 generation_rate=generation_rate
             )
-            client.add_parent(data_gen)
+            client.add_parent(data_gen, input_name=input_name)
             data_generators.append(data_gen)
 
         for output in client.outputs:
