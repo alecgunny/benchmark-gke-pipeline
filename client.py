@@ -269,7 +269,7 @@ if __name__ == "__main__":
         help="Number of warm up requests to make"
     )
     runtime_parser.add_argument(
-        "--file_prefix",
+        "--file-prefix",
         type=str,
         default=None,
         help="Prefix to attach to monitor files"

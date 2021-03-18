@@ -178,7 +178,7 @@ class ClientStatsMonitor(ThreadedStatWriter):
     def __init__(
         self,
         output_file: str,
-        clients: typing.List[StreamingInferenceClient]
+        clients: typing.List["StreamingInferenceClient"]
     ):
         self.qs = {client.name: client._metric_q for client in clients}
         self.n = 0
