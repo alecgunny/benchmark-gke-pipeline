@@ -1,4 +1,6 @@
+import re
 import requests
+import time
 import typing
 from threading import Event, Thread
 from queue import Empty, Queue
@@ -95,7 +97,6 @@ class ServerStatsMonitor(ThreadedStatWriter):
         output_file: str,
         url: str,
         model_name: str,
-        qps_limit: float = 1000.,
         monitor: typing.Optional[str] = None,
         limit: typing.Optional[float] = None
     ):
@@ -107,6 +108,8 @@ class ServerStatsMonitor(ThreadedStatWriter):
             ]
         else:
             self.models = [model_config.name]
+
+        # TODO: make this more general
         self.url = "http://" + url.replace("8001", "8002/metrics")
 
         if monitor is not None and limit is None:
@@ -120,43 +123,78 @@ class ServerStatsMonitor(ThreadedStatWriter):
         self.limit = limit
 
         self.stats = defaultdict(lambda: defaultdict(ServerInferenceMetric))
-        self.qps_limit = qps_limit
 
         processes = [
-            "success", "queue", "compute_input", "compute_infer", "compute_output"
+            "success",
+            "queue",
+            "compute_input",
+            "compute_infer",
+            "compute_output"
         ]
+
+        columns = processes + ["gpu_utilization", "model", "count", "interval"]
+        self._last_time = time.time()
+
         super().__init__(
-            output_file, columns=["model"] + processes + ["count"]
+            output_file, columns=columns
         )
 
         # initialize metrics
         _ = self._get_values()
 
+    def _get_gpu_id(self, row):
+        id = re.search('(?<=gpu_uuid=").+(?="})', row)
+        if id is not None:
+            return id.group(0)
+        return
+
+    def _get_row_value(self, row):
+        return float(row.split()[1])
+
+    def _filter_rows_by_start(self, rows, start):
+        return [i for i in rows if i.startswith(start)]
+
+    def _filter_rows_by_content(self, rows, content):
+        return [i for i in rows if content in i]
+
     def _get_values(self):
+        response = requests.get(self.url)
+        new_time = time.time()
+        interval = self._last_time - new_time
+        self._last_time = time.time()
+
+        content = response.content.decode("utf-8").split("\n")
+        util_rows = self._filter_rows_by_start(content, "nv_gpu_utilization")
+        gpu_util = sum(map(self._get_row_value, util_rows)) / len(util_rows)
+
         values = []
-        content = requests.get(self.url).content.decode("utf-8").split("\n")
         for model in self.models:
-            model_stats = [i for i in content if f'model="{model}",' in i]
+            model_stats = self._filter_rows_by_content(
+                content, f'model="{model}",'
+            )
             if len(model_stats) == 0:
                 raise ValueError("couldn't find model in content")
 
-            counts = [
-                float(i.split(" ")[1]) for i in model_stats if i.startswith(
-                    "nv_inference_request_success"
+            counts = map(
+                self._get_row_value,
+                self._filter_rows_by_start(
+                    model_stats, "nv_inference_request_success"
                 )
-            ]
+            )
             count = sum(counts)
 
-            model_values = [model]
+            model_values = []
             for process in self.columns[1:-1]:
                 field = process if process != "success" else "request"
-                process_times = [
-                    float(i.split(" ")[1]) for i in model_stats if i.startswith(
-                        f"nv_inference_{field}_duration_us"
+                process_times = list(map(
+                    self._get_row_value,
+                    self._filter_rows_by_start(
+                        model_stats, f"nv_inference_{field}_duration_us"
                     )
-                ]
-                ns = sum(process_times)
-                data = self.stats[model][process].update(count, ns)
+                ))
+
+                us = sum(process_times)
+                data = self.stats[model][process].update(count, us)
                 if data is None:
                     return
 
@@ -168,7 +206,7 @@ class ServerStatsMonitor(ThreadedStatWriter):
                         self._error_q.put(t)
                         raise UnstableQueueException
 
-            model_values.append(diff)
+            model_values.extend([gpu_util, model, diff, interval])
             values.append(model_values)
 
         return values
