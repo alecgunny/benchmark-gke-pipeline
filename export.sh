@@ -108,7 +108,7 @@ python export.py \
 
 # create the specified bucket if it doesn't exist
 [[ ! -z $(gsutil ls -p ${project} gs:// | grep gs://${bucket}) ]] || \
-    gsutil mb -p ${project} gs://${bucket}
+    gsutil mb -p ${project} gs://${bucket} || ("GCS bucket named ${bucket} already exists" && exit 1)
 
 # copy all the repo contents to the bucket
 gsutil cp -r ${repo}/* gs://${bucket}
