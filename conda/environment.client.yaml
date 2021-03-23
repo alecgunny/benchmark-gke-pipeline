@@ -2,11 +2,12 @@ name: gwe2e-client
 channels:
   - conda-forge
 dependencies:
-  - python3.8
+  - python=3.8
   - attrs
-  - tblib
-  - pandas
   - numpy
+  - pandas
+  - requests
+  - tblib
   - pip
-  pip:
+  - pip:
     - -r requirements.client.txt
