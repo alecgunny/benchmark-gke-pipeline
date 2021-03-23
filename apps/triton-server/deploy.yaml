@@ -39,20 +39,20 @@ spec:
           name: grpc
         - containerPort: 8002
           name: metrics
-        # livenessProbe:
-        #   failureThreshold: 30
-        #   initialDelaySeconds: 100
-        #   periodSeconds: 5
-        #   httpGet:
-        #     path: /v2/health/live
-        #     port: http
-        # readinessProbe:
-        #   failureThreshold: 30
-        #   initialDelaySeconds: 100
-        #   periodSeconds: 5
-        #   httpGet:
-        #     path: /v2/health/ready
-        #     port: http
+        livenessProbe:
+          failureThreshold: 30
+          initialDelaySeconds: 100
+          periodSeconds: 5
+          httpGet:
+            path: /v2/health/live
+            port: http
+        readinessProbe:
+          failureThreshold: 30
+          initialDelaySeconds: 300
+          periodSeconds: 5
+          httpGet:
+            path: /v2/health/ready
+            port: http
       nodeSelector:
         cloud.google.com/gke-accelerator: nvidia-tesla-t4
 ---

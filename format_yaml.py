@@ -42,11 +42,15 @@ if __name__ == "__main__":
     for field in map(result_re.search, fields):
         if field is None:
             continue
-        full_parser.add_argument(
-            "--" + field.group(0),
-            type=str,
-            required=True
-        )
+        try:
+            full_parser.add_argument(
+                "--" + field.group(0),
+                type=str,
+                required=True
+            )
+        except argparse.ArgumentError as e:
+            if "conflicting option string" not in str(e):
+                raise
 
     flags = full_parser.parse_args([flags.filename] + others)
     main(**vars(flags))

@@ -54,10 +54,12 @@ while getopts "c:p:z:b:G:g:v:N:r:i:q:l:h" opt; do
             echo "    -b: GCP bucket where Triton model repository is hosted"
             echo "    -G: Desired number of GPUs per node in server node pool"
             echo "    -g: Desired number of GPUs per deployment. Must be less than or equal to -G"
+            echo "    -v: Desired number of vCPUs per GPU"
             echo "    -N: Number of server nodes (and client instances) to leverage"
             echo "    -r: Rate at which to generate requests from each client"
             echo "    -i: Number of iterations over which to run client benchmarking"
             echo "    -q: Maximum allowable queuing time for any model in microseconds"
+            echo "    -l: Maximum allowable end-to-end latency in seconds"
             exit 0
             ;;
         \? )
@@ -81,6 +83,7 @@ for i in $(seq $nodes); do
         name="tritonserver"
     else
         name="tritonserver-${i}"
+    fi
 
     ./start-server.sh \
         -c ${cluster} \
@@ -101,16 +104,30 @@ for i in $(seq $nodes); do
         name="tritonserver"
     else
         name="tritonserver-${i}"
+    fi
 
     ip=$(kubectl get service $name -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-    python client.py \
-        --url $ip:8001 \
-        --model-name gwe2e \
-        --model-version 1 \
-        --generation-rate ${rate} \
-        --num-iterations ${iterations} \
-        --warm-up 10 \
-        --file-prefix "node-${i}" \
-        --queue-threshold-us ${queue} \
-        --latency-threshold ${latency} &> node-${i}_output.log
+    if [[ $i == $nodes ]]; then
+        python client.py \
+            --url $ip:8001 \
+            --model-name gwe2e \
+            --model-version 1 \
+            --generation-rate ${rate} \
+            --num-iterations ${iterations} \
+            --warm-up 10 \
+            --file-prefix "node-${i}" \
+            --queue-threshold-us ${queue} \
+            --latency-threshold ${latency} 2>&1 | tee node-${i}_output.log
+    else
+        python client.py \
+            --url $ip:8001 \
+            --model-name gwe2e \
+            --model-version 1 \
+            --generation-rate ${rate} \
+            --num-iterations ${iterations} \
+            --warm-up 10 \
+            --file-prefix "node-${i}" \
+            --queue-threshold-us ${queue} \
+            --latency-threshold ${latency} &> node-${i}_output.log
+    fi
 done
