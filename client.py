@@ -60,7 +60,10 @@ def main(
         output_pipes,
         server_monitor={
             "output_file": f"{file_prefix}server-stats.csv",
-            "snapshotter_queue": queue_threshold_us
+            "snapshotter_queue": queue_threshold_us,
+            "deepclean_l_queue": queue_threshold_us,
+            "deepclean_h_queue": queue_threshold_us,
+            "bbh_queue": queue_threshold_us
         },
         client_monitor={
             "output_file": f"{file_prefix}client-stats.csv",

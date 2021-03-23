@@ -38,9 +38,11 @@ Before we export, be sure to activate the export conda environment
 conda activate gwe2e-export
 ```
 
-Now exporting the relevant models locally then ship them to a GCS bucket. If you only ever plan on leveraging a single kernel stride, you'll only need to do this once up front.
+Now exporting the relevant models locally then ship them to a GCS bucket. If you only ever plan on leveraging a single kernel stride, you'll only need to do this once up front. Note that if the bucket you point to doesn't exist in your project, the script will attempt to create one by that name. GCS bucket names must be _globally_ unique: that is, buckets of any given name can only exist once on _any_ project _anywhere_, so be sure to come up with a unique name or the script will error out if it attempts to create a bucket that already exists.
 ```
 KERNEL_STRIDE=0.002
+STREAMS_PER_GPU=2
+INSTANCES_PER_GPUS=2
 LOCAL_REPO_NAME=./repo
 BUCKET_NAME=gw-benchmarking_model-repo
 
@@ -51,8 +53,8 @@ BUCKET_NAME=gw-benchmarking_model-repo
 
 ./export.sh -c $CLUSTER_NAME -z $ZONE -p $PROJECT \
     -r $LOCAL_REPO_NAME -b $BUCKET_NAME \
-    -k $KERNEL_STRIDE -i 1 -s 1 \
-    -t -f -d
+    -k $KERNEL_STRIDE -i $INSTANCES_PER_GPU \
+    -s $STREAMS_PER_GPU -t -f -d
 ```
 
 
