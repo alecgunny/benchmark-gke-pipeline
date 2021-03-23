@@ -48,7 +48,7 @@ spec:
             port: http
         readinessProbe:
           failureThreshold: 30
-          initialDelaySeconds: 300
+          initialDelaySeconds: 600
           periodSeconds: 5
           httpGet:
             path: /v2/health/ready
