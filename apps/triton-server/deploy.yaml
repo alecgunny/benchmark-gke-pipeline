@@ -1,18 +1,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: tritonserver
+  name: {{ .Values.name }}
   namespace: default
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: tritonserver
+      app: {{ .Values.name }}
   progressDeadlineSeconds: 100
   template:
     metadata:
       labels:
-        app: tritonserver
+        app: {{ .Values.name }}
     spec:
       securityContext:
         runAsUser: 1000
@@ -39,27 +39,27 @@ spec:
           name: grpc
         - containerPort: 8002
           name: metrics
-        livenessProbe:
-          failureThreshold: 30
-          initialDelaySeconds: 100
-          periodSeconds: 5
-          httpGet:
-            path: /v2/health/live
-            port: http
-        readinessProbe:
-          failureThreshold: 30
-          initialDelaySeconds: 100
-          periodSeconds: 5
-          httpGet:
-            path: /v2/health/ready
-            port: http
+        # livenessProbe:
+        #   failureThreshold: 30
+        #   initialDelaySeconds: 100
+        #   periodSeconds: 5
+        #   httpGet:
+        #     path: /v2/health/live
+        #     port: http
+        # readinessProbe:
+        #   failureThreshold: 30
+        #   initialDelaySeconds: 100
+        #   periodSeconds: 5
+        #   httpGet:
+        #     path: /v2/health/ready
+        #     port: http
       nodeSelector:
         cloud.google.com/gke-accelerator: nvidia-tesla-t4
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: tritonserver
+  name: {{ .Values.name }}
   namespace: default
 spec:
   #externalTrafficPolicy: Cluster
@@ -77,6 +77,6 @@ spec:
     protocol: TCP
     targetPort: 8002
   selector:
-    app: tritonserver
+    app: {{ .Values.name }}
   sessionAffinity: None
   type: LoadBalancer

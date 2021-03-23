@@ -1,0 +1,4 @@
+--extra-index-url "https://pypi.ngc.nvidia.com"
+tritonclient[all]
+
+git+https://github.com/alecgunny/stillwater@multistream
