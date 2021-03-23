@@ -57,16 +57,71 @@ BUCKET_NAME=gw-benchmarking_model-repo
     -s $STREAMS_PER_GPU -t -f -d
 ```
 
+### Start the server and deloy the clients locally
+For **_local_** client deployment, activate the client conda environment
+```
+conda activate gwe2e-client
+```
 
-### Start the Triton Server
-Create a T4 node pool then deploy the Triton server container on to it, pointing it at our export bucket.
+Then run `client.sh`, which will spin up server nodes as well as
+local clients for benchmarking
+
 ```
 NUM_GPUS=2
-NUM_VCPUS=32
+VCPUS_PER_GPU=16
 NUM_NODES=1
-./start-server.sh -c $CLUSTER_NAME -z $ZONE -p $PROJECT \
-    -b $BUCKET_NAME -g $NUM_GPUS -v $NUM_VCPUS -N 1
+DATA_GENERATRION_RATE=1200
+ITERATIONS=50000
+LATENCY_THRESHOLD_SECONDS=1
+Q_THRESHOLD_MICROSECONDS=100000
+
+./client.sh -c $CLUSTER_NAME -p $PROJECT -z $ZONE \
+    -b $BUCKET_NAME -G $NUM_GPUS -g $NUM_GPUS -v $VCPUS_PER_GPU \
+    -N $NUM_NODES -r $DATA_GENERATION_RATE -i $ITERATIONS \
+    -q $Q_THRESHOLD_MICROSECONDS -l $LATENCY_THRESHOLD_SECONDS
 ```
 
-### Deploy the client nodes and run experiment
-This is the part that needs completing.
+This will profile an inference run and dump the measurements into csvs `node-<i>_<server|client>-stats.csv` and any logs or erros into `node-<i>_output.log`, where `i` indexes each client instance.
+
+
+### Multi-client deployment
+In this case, you'll need to start by spinning up multiple servers yourself from your local node using a loop like at the top of `client.sh`:
+```
+# note that you'll probably want to create multiple nodes
+# if you want to use multiple clients, since one client
+# is more than capable of saturating at least one node,
+# if not more
+NUM_NODES=<some value greater than 1>
+
+# also note that only the first iteration actually creates
+# a node pool - after the first run we detect that a node
+# pool already exists and just ignore it and create the
+# new deployment/service with a new name to get a new node
+for i in $(seq $NUM_NODES); do
+    ./start-server.sh -c $CLUSTER_NAME -p $PROJECT -z $ZONE \
+        -b $BUCKET_NAME -G $NUM_GPUS -g $NUM_GPUS \ 
+        -v $VCPUS_PER_GPU -N $NUM_NODES -n "tritonserver-${i}"
+done
+```
+
+Then you'll need to build a loop that looks a lot like the one at the bottom of `client.sh`, where you start a client instance for each IP address:
+```
+for i in $(seq $NUM_NODES); do
+    <whatever your command is that spins up a client node>
+
+    # make sure this command runs asynchronously so
+    # that all the clients run simultaneously
+
+    name="tritonserver-${i}"
+    ip=$(kubectl get service $name -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+    <some remote execution command> python client.py \
+            --url $ip:8001 \
+            --model-name gwe2e \
+            --model-version 1 \
+            --generation-rate ${rate} \
+            --num-iterations ${iterations} \
+            --warm-up 10 \
+            --file-prefix "node-${i}" \
+            --queue-threshold-us ${queue} \
+            --latency-threshold ${latency}
+```
