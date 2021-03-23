@@ -124,4 +124,5 @@ for i in $(seq $NUM_NODES); do
             --file-prefix "node-${i}" \
             --queue-threshold-us ${queue} \
             --latency-threshold ${latency}
+done
 ```
