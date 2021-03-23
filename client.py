@@ -5,7 +5,7 @@ import numpy as np
 import tritonclient.grpc as triton
 from stillwater import (
     DummyDataGenerator,
-    MultiSourceDataGenerator,
+    MultiSourceGenerator,
     ThreadedMultiStreamInferenceClient
 )
 
@@ -35,21 +35,21 @@ def main(
         seq_id = sequence_id + i
 
         sources = []
-        for state_name, shape in client.states:
+        for state_name, shape in client.states.items():
             sources.append(DummyDataGenerator(
                 shape=shape,
                 name=state_name,
                 generation_rate=generation_rate
             ))
-        source = MultiSourceDataGenerator(sources)
-        pipe = client.add_data_source(source, seq_id)
+        source = MultiSourceGenerator(sources)
+        pipe = client.add_data_source(source, str(seq_id), seq_id)
         output_pipes[seq_id] = pipe
 
     warm_up_client = triton.InferenceServerClient(url)
     warm_up_inputs = []
-    for input in client.model_config.input:
-        x = triton.InferInput(input.name, tuple(input.dims), input.datatype)
-        x.set_data_from_numpy(np.random.randn(*input.dims).astype("float32"))
+    for input in client.model_metadata.inputs:
+        x = triton.InferInput(input.name, input.shape, input.datatype)
+        x.set_data_from_numpy(np.random.randn(*input.shape).astype("float32"))
         warm_up_inputs.append(x)
 
     for i in range(warm_up):
