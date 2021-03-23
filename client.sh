@@ -1,6 +1,6 @@
 #! /bin/bash -e
 
-while getopts "c:p:z:b:G:g:v:N:r:i:h" opt; do
+while getopts "c:p:z:b:G:g:v:N:r:i:q:l:h" opt; do
     case ${opt} in
         c )
             cluster=${OPTARG}
@@ -32,6 +32,12 @@ while getopts "c:p:z:b:G:g:v:N:r:i:h" opt; do
         i )
             iterations=${OPTARG}
             ;;
+        q )
+            queue=${OPTARG}
+            ;;
+        l )
+            latency=${OPTARG}
+            ;;
         h )
             echo "Create a GPU node pool and deploy Triton server"
             echo "deployments and load balancers onto it, then run"
@@ -51,6 +57,7 @@ while getopts "c:p:z:b:G:g:v:N:r:i:h" opt; do
             echo "    -N: Number of server nodes (and client instances) to leverage"
             echo "    -r: Rate at which to generate requests from each client"
             echo "    -i: Number of iterations over which to run client benchmarking"
+            echo "    -q: Maximum allowable queuing time for any model in microseconds"
             exit 0
             ;;
         \? )
@@ -87,6 +94,8 @@ for i in $(seq $nodes); do
         -n ${name}
 done
 
+queue=${queue:-100000}
+latency=${latency:-1}
 for i in $(seq $nodes); do
     if [[ $nodes == 1 ]]; then
         name="tritonserver"
@@ -101,5 +110,7 @@ for i in $(seq $nodes); do
         --generation-rate ${rate} \
         --num-iterations ${iterations} \
         --warm-up 10 \
-        --file-prefix "node-${i}" &> node-${i}_output.log
+        --file-prefix "node-${i}" \
+        --queue-threshold-us ${queue} \
+        --latency-threshold ${latency} &> node-${i}_output.log
 done

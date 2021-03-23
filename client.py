@@ -20,8 +20,8 @@ def main(
     num_iterations: int = 10000,
     warm_up: typing.Optional[int] = None,
     file_prefix: typing.Optional[str] = None,
-    latency_threshold: float = 0.1,
-    queue_threshold_us: float = 20000
+    latency_threshold: float = 1.,
+    queue_threshold_us: float = 100000
 ):
     client = ThreadedMultiStreamInferenceClient(
         url=url,
@@ -73,13 +73,8 @@ def main(
     )
 
     print(f"Gathering performance metrics over {num_iterations} iterations")
-    packages_recvd = 0
-    for seq_id, _ in monitor:
-        if seq_id is not None:
-            packages_recvd += 1
-
-        if packages_recvd == num_iterations:
-            break
+    for (seq_id, x), i in zip(monitor, range(num_iterations)):
+        continue
 
 
 if __name__ == "__main__":
@@ -155,6 +150,18 @@ if __name__ == "__main__":
         type=str,
         default=None,
         help="Prefix to attach to monitor files"
+    )
+    runtime_parser.add_argument(
+        "--queue-threshold-us",
+        type=float,
+        default=100000,
+        help="Maximum allowable queuing time in microseconds"
+    )
+    runtime_parser.add_argument(
+        "--latency-threshold",
+        type=float,
+        default=1.,
+        help="Maximum allowable end-to-end latency in seconds"
     )
     flags = parser.parse_args()
     main(**vars(flags))
