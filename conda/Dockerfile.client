@@ -12,6 +12,7 @@ RUN apt-get update && \
             numpy \
             pandas \
             requests \
+            setuptools \
             tblib \
             tritonclient[all] \
             git+https://github.com/alecgunny/stillwater@multistream
