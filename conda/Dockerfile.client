@@ -6,12 +6,13 @@ RUN apt-get update && \
         add-apt-repository ppa:deadsnakes/ppa && \
         apt-get update && \
         apt-get install -y --no-install-recommends python3.8 python3-pip python3-setuptools && \
-        pip3 install --extra-index-url "https://pypi.ngc.nvidia.com" \
+        pip3 install  \
             attrs \
             numpy \
             pandas \
             requests \
             tblib \
+            --extra-index-url "https://pypi.ngc.nvidia.com" \
             tritonclient[all] \
             git+https://github.com/alecgunny/stillwater@multistream
 
