@@ -14,8 +14,8 @@ RUN apt-get update && \
             pandas \
             requests \
             tblib \
-            tritonclient[all] \
-            git+https://github.com/alecgunny/stillwater@multistream
+            git+https://github.com/alecgunny/stillwater@multistream && \
+        pip3 install tritonclient[all]
 
 ENV HOME=/home/docker
 WORKDIR /home/docker
