@@ -6,7 +6,7 @@ RUN apt-get update && \
         apt-get update && \
         apt-get install -y --no-install-recommends python3.8 && \
         apt-get install -y --no-install-recommends python3-pip && \
-        pip install --extra-index-url "https://pypi.ngc.nvidia.com" \
+        pip3 install --extra-index-url "https://pypi.ngc.nvidia.com" \
             attrs \
             numpy \
             pandas \
