@@ -1,0 +1,19 @@
+FROM ubuntu:18.04
+
+RUN apt-get update && \
+        apt-get install software-properties-common && \
+        add-apt-repository ppa:deadsnakes/ppa && \
+        apt-get update && \
+        apt-get install python3.8 && \
+        pip install --extra-index-url "https://pypi.ngc.nvidia.com" \
+            attrs \
+            numpy \
+            pandas \
+            requests \
+            tblib \
+            tritonclient[all] \
+            git+https://github.com/alecgunny/stillwater@multistream
+
+ENV HOME=/home/docker
+WORKDIR /home/docker
+ADD client.py /home/docker/client.py
