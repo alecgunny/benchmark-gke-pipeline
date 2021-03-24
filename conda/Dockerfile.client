@@ -5,14 +5,12 @@ RUN apt-get update && \
         apt-get install -y --no-install-recommends software-properties-common git-all && \
         add-apt-repository ppa:deadsnakes/ppa && \
         apt-get update && \
-        apt-get install -y --no-install-recommends python3.8 && \
-        apt-get install -y --no-install-recommends python3-pip && \
+        apt-get install -y --no-install-recommends python3.8 python3-pip python3-setuptools && \
         pip3 install --extra-index-url "https://pypi.ngc.nvidia.com" \
             attrs \
             numpy \
             pandas \
             requests \
-            setuptools \
             tblib \
             tritonclient[all] \
             git+https://github.com/alecgunny/stillwater@multistream
