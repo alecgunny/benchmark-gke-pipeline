@@ -179,6 +179,6 @@ if __name__ == "__main__":
         logging.basicConfig(filename=log_file, level=logging.INFO)
 
     try:
-        main(**vars(flags))
+        main(**flags)
     except Exception:
         logging.exception("Fatal error")
