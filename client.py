@@ -1,4 +1,5 @@
 import argparse
+import logging
 import typing
 
 import numpy as np
@@ -72,7 +73,9 @@ def main(
         timeout=10
     )
 
-    print(f"Gathering performance metrics over {num_iterations} iterations")
+    logging.info(
+        f"Gathering performance metrics over {num_iterations} iterations"
+    )
     for (seq_id, x), i in zip(monitor, range(num_iterations)):
         continue
 
@@ -163,5 +166,19 @@ if __name__ == "__main__":
         default=1.,
         help="Maximum allowable end-to-end latency in seconds"
     )
-    flags = parser.parse_args()
-    main(**vars(flags))
+    runtime_parser.add_argument(
+        "--log-file",
+        type=str,
+        default=None,
+        help="Optional log file to write to"
+    )
+    flags = vars(parser.parse_args())
+
+    log_file = flags.pop("log_file")
+    if log_file is not None:
+        logging.basicConfig(filename=log_file, level=logging.INFO)
+
+    try:
+        main(**vars(flags))
+    except Exception:
+        logging.exception("Fatal error")
