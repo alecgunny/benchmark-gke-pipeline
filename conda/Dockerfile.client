@@ -1,16 +1,22 @@
 FROM python:3.8-slim-buster
 
 ENV DEBIAN_FRONTEND="noninteractive"
-RUN pip install \
-        attrs \
-        google-cloud-storage \
-        numpy \
-        nvidia-pyindex \
-        pandas \
-        requests \
-        tblib \
-        git+https://github.com/alecgunny/stillwater@multistream && \
-    pip install tritonclient[all]
+RUN set -ex \
+        \
+        && apt-get update && apt-get install -y --no-install-recommends git \
+        \
+        && pip install \
+            attrs \
+            google-cloud-storage \
+            numpy \
+            nvidia-pyindex \
+            pandas \
+            requests \
+            tblib \
+            git+https://github.com/alecgunny/stillwater@multistream \
+        && pip install tritonclient[all] && \
+        \
+        && rm -rf /var/lib/apt/lists/*
 
 ENV HOME=/home/docker
 WORKDIR /home/docker
