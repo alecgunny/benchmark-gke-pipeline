@@ -14,11 +14,11 @@ RUN set -ex \
             requests \
             tblib \
             git+https://github.com/alecgunny/stillwater@multistream \
-        && pip install tritonclient[all] && \
+        && pip install tritonclient[all] \
         \
         && rm -rf /var/lib/apt/lists/*
 
 ENV HOME=/home/docker
-WORKDIR /home/docker
-ADD client.py /home/docker/client.py
+WORKDIR $HOME
+ADD client.py $HOME
 ENTRYPOINT ["python", "client.py"]
