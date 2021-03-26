@@ -1,2 +1,5 @@
 **/__pycache__/
-*.csv
+results/
+**/*.csv
+**/*.log
+**/.ipynb_checkpoints/
