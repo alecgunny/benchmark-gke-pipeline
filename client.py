@@ -28,6 +28,7 @@ def main(
         url=url,
         model_name=model_name,
         model_version=model_version,
+        qps_limit=generation_rate,
         name="client"
     )
 
@@ -40,7 +41,6 @@ def main(
             sources.append(DummyDataGenerator(
                 shape=shape,
                 name=state_name,
-                generation_rate=generation_rate
             ))
         source = MultiSourceGenerator(sources)
         pipe = client.add_data_source(source, str(seq_id), seq_id)
