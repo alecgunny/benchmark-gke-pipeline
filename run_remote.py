@@ -1,4 +1,5 @@
 import argparse
+import os
 import subprocess
 import time
 
@@ -53,11 +54,32 @@ def main(
         run_cmd(cmd, True)
         time.sleep(10)
 
-        _wait_for_container_completion(vm_name, project, ssh_key_file)
-        _copy_results(vm_name, project, ssh_key_file, generation_rate)
-
-        cmd = _get_delete_cmd(vm_name, project)
-        run_cmd(cmd, True)
+        try:
+            _wait_for_container_completion(vm_name, project, ssh_key_file)
+            _copy_results(vm_name, project, ssh_key_file, generation_rate)
+        except RuntimeError as e:
+            try:
+                cmd = _get_scp_cmd(
+                    "output.log",
+                    vm_name,
+                    project,
+                    ssh_key_file,
+                    generation_rate,
+                    1
+                )
+                run_cmd(cmd, True)
+            except Exception:
+                pass
+            else:
+                prefix = f"generation-rate={generation_rate}_clients=1"
+                with open(prefix + "_output.log", "r") as f:
+                    print(f.read())
+                os.remove(prefix + "_output.log")
+            finally:
+                raise e
+        finally:
+            cmd = _get_delete_cmd(vm_name, project)
+            run_cmd(cmd, True)
 
 
 def _wait_for_container_completion(vm_name, project, ssh_key_file):
@@ -78,7 +100,7 @@ def _wait_for_container_completion(vm_name, project, ssh_key_file):
                 if time.time() - start_time > start_up_sleep:
                     raise RuntimeError(
                         "Container hasn't started after {} seconds, "
-                        "`docker ps` returned:\n{}\n{}".format(
+                        "`docker ps` returned:\n{}".format(
                             start_up_sleep + 10, result
                         )
                     )
