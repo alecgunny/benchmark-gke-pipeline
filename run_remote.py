@@ -71,7 +71,7 @@ def main(
             except Exception:
                 pass
             else:
-                prefix = f"generation-rate={generation_rate}_clients=1"
+                prefix = f"results/generation-rate={generation_rate}_clients=1"
                 with open(prefix + "_output.log", "r") as f:
                     print(f.read())
                 os.remove(prefix + "_output.log")
