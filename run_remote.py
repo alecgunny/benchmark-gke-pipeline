@@ -2,6 +2,7 @@ import argparse
 import os
 import subprocess
 import time
+import typing
 
 from google.oauth2 import service_account
 
@@ -24,8 +25,10 @@ def main(
     ssh_key_file: str,
     start: int,
     stop: int,
-    step: int
+    step: int,
+    output_dir: typing.Optional[str] = None
 ) -> None:
+    output_dir = output_dir or "."
     credentials = service_account.Credentials.from_service_account_file(
         service_account_key_file
     )
@@ -40,12 +43,14 @@ def main(
         16
     )
 
-    for generation_rate in range(start, stop, step):
+    generation_rate = start
+    num_clients = 1
+    while True:
         client_cmd = _get_client_cmd(
             ip_address,
             generation_rate,
             num_iterations=50000,
-            num_clients=1,
+            num_clients=num_clients,
             latency_threshold=1.0,
             queue_threshold=100000
         )
@@ -56,7 +61,14 @@ def main(
 
         try:
             _wait_for_container_completion(vm_name, project, ssh_key_file)
-            _copy_results(vm_name, project, ssh_key_file, generation_rate)
+            _copy_results(
+                vm_name,
+                project,
+                ssh_key_file,
+                generation_rate,
+                num_clients,
+                output_dir
+            )
         except RuntimeError as e:
             try:
                 cmd = _get_scp_cmd(
@@ -65,21 +77,44 @@ def main(
                     project,
                     ssh_key_file,
                     generation_rate,
-                    1
+                    num_clients,
+                    output_dir
                 )
                 run_cmd(cmd, True)
             except Exception:
                 pass
             else:
-                prefix = f"results/generation-rate={generation_rate}_clients=1"
-                with open(prefix + "_output.log", "r") as f:
+                prefix = "generation-rate={}_clients={}".format(
+                    generation_rate, num_clients
+                )
+                fname = os.path.join(output_dir, prefix + "_output.log")
+                with open(fname, "r") as f:
                     print(f.read())
-                os.remove(prefix + "_output.log")
+                os.remove(fname)
             finally:
                 raise e
         finally:
             cmd = _get_delete_cmd(vm_name, project)
             run_cmd(cmd, True)
+
+        if stop is not None:
+            generation_rate += step
+            if generation_rate >= stop:
+                break
+        else:
+            prefix = "generation-rate={}_clients={}".format(
+                generation_rate, num_clients
+            )
+            fname = os.path.join(output_dir, prefix + "_output.log")
+            with open(fname, "r") as f:
+                log = f.read()
+            if "MonitoredMetricViolationException" in log:
+                if "snapshotter_queue" in log:
+                    num_clients += 1
+                else:
+                    return generation_rate, num_clients
+            else:
+                generation_rate += step
 
 
 def _wait_for_container_completion(vm_name, project, ssh_key_file):
@@ -110,7 +145,14 @@ def _wait_for_container_completion(vm_name, project, ssh_key_file):
             container_started = True
 
 
-def _copy_results(vm_name, project, ssh_key_file, generation_rate):
+def _copy_results(
+    vm_name,
+    project,
+    ssh_key_file,
+    generation_rate,
+    num_clients,
+    output_dir
+):
     for fname in ["output.log", "_server-stats.csv", "_client-stats.csv"]:
         cmd = _get_scp_cmd(
             fname,
@@ -118,7 +160,8 @@ def _copy_results(vm_name, project, ssh_key_file, generation_rate):
             project,
             ssh_key_file,
             generation_rate,
-            1
+            num_clients,
+            output_dir
         )
         try:
             run_cmd(cmd, True)
@@ -138,14 +181,15 @@ def _get_scp_cmd(
     project,
     ssh_key_file,
     generation_rate,
-    num_clients
+    num_clients,
+    output_dir
 ):
     # TODO: add username
     prefix = f"generation-rate={generation_rate}_clients={num_clients}"
     cmd = f"gcloud compute scp --project {project} "
     cmd += f"--ssh-key-file {ssh_key_file} "
     cmd += f"alec.gunny@{name}:/home/{remote_fname} "
-    cmd += f"results/{prefix}_{remote_fname}"
+    cmd += os.path.join(output_dir, f"{prefix}_{remote_fname}")
     return cmd
 
 
@@ -208,7 +252,7 @@ if __name__ == "__main__":
         help="Name to give client VM instance"
     )
     parser.add_argument(
-        "--ip_address",
+        "--ip-address",
         type=str,
         required=True,
         help="IP address of Triton server"
@@ -228,14 +272,23 @@ if __name__ == "__main__":
     parser.add_argument(
         "--stop",
         type=int,
-        required=True,
-        help="Final generation rate"
+        default=None,
+        help=(
+            "Final generation rate. If `None`, run until "
+            "a metric violates its threshold limit."
+        )
     )
     parser.add_argument(
         "--step",
         type=int,
         required=True,
         help="Interval at which to increase generation rate"
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=None,
+        help="where to write results to"
     )
 
     flags = parser.parse_args()
