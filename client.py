@@ -179,7 +179,12 @@ if __name__ == "__main__":
     if log_file is not None:
         logging.basicConfig(filename=log_file, level=logging.INFO)
 
-    logging.info(platform.processor())
+    with open("/proc/cpuinfo", "r") as f:
+        cpuinfo = f.read.split("\n")
+    cpuinfo = [i.split(": ")[1] for i in cpuinfo if i.startswith("model name")]
+    for p in cpuinfo:
+        logging.info(p)
+
     try:
         main(**flags)
     except Exception:
