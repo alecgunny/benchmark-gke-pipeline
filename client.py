@@ -180,7 +180,7 @@ if __name__ == "__main__":
         logging.basicConfig(filename=log_file, level=logging.INFO)
 
     with open("/proc/cpuinfo", "r") as f:
-        cpuinfo = f.read.split("\n")
+        cpuinfo = f.read().split("\n")
     cpuinfo = [i.split(": ")[1] for i in cpuinfo if i.startswith("model name")]
     for p in cpuinfo:
         logging.info(p)
