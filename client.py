@@ -1,5 +1,6 @@
 import argparse
 import logging
+import platform
 import typing
 
 import numpy as np
@@ -178,6 +179,7 @@ if __name__ == "__main__":
     if log_file is not None:
         logging.basicConfig(filename=log_file, level=logging.INFO)
 
+    logging.info(platform.processor())
     try:
         main(**flags)
     except Exception:
