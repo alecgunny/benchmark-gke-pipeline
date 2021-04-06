@@ -203,7 +203,8 @@ if __name__ == "__main__":
         logging.info(f"CPU family {f}, model {m}")
 
     num_violations = 0
-    while num_violations <= flags["num_retries"]:
+    num_retries = flags.pop("num_retries")
+    while num_violations <= num_retries:
         try:
             main(**flags)
             break
