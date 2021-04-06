@@ -1,15 +1,24 @@
 import argparse
 import logging
-import platform
 import typing
 
 import numpy as np
+import pandas as pd
 import tritonclient.grpc as triton
 from stillwater import (
     DummyDataGenerator,
     MultiSourceGenerator,
     ThreadedMultiStreamInferenceClient
 )
+from stillwater.client.monitor import MonitoredMetricViolationException
+
+
+def _normalize_file_prefix(file_prefix):
+    if file_prefix is None:
+        file_prefix = ""
+    elif not os.path.isdir(file_prefix):
+        file_prefix = file_prefix + "_"
+    return file_prefix
 
 
 def main(
@@ -57,7 +66,7 @@ def main(
     for i in range(warm_up):
         warm_up_client.infer(model_name, warm_up_inputs, str(model_version))
 
-    file_prefix = "" if file_prefix is None else (file_prefix + "_")
+    file_prefix = _normalize_file_prefix(file_prefix)
     monitor = client.monitor(
         output_pipes,
         server_monitor={
@@ -173,6 +182,12 @@ if __name__ == "__main__":
         default=None,
         help="Optional log file to write to"
     )
+    runtime_parser.add_argument(
+        "--num-retries",
+        type=int,
+        default=0,
+        help="Retry attempts if running into thread issue"
+    )
     flags = vars(parser.parse_args())
 
     log_file = flags.pop("log_file")
@@ -185,7 +200,32 @@ if __name__ == "__main__":
     for p in cpuinfo:
         logging.info(p)
 
-    try:
-        main(**flags)
-    except Exception:
-        logging.exception("Fatal error")
+    num_violations = 0
+    while num_violations <= flags.num_retries:
+        try:
+            main(**flags)
+            break
+        except MonitoredMetricViolationException as e:
+            logging.exception("Metric violation")
+            if "latency" not in str(e):
+                raise
+            else:
+                file_prefix = _normalize_file_prefix(flags.file_prefix)
+                df = pd.read_csv(f"{file_prefix}server-stats.csv")
+
+                df["step"] = df.index // 6
+                elapsed = df.groupby("step")[["interval"]].agg("mean").cumsum()
+                elapsed.columns = ["elapsed"]
+                df = df.join(elapsed, on="step")
+                df = df[df.elapsed < df.elapsed.max() - 2]
+
+                if np.percentile(df.queue, 99) < 200:
+                    num_violations += 1
+                    continue
+                else:
+                    raise
+        except Exception:
+            logging.exception("Fatal error")
+    else:
+        logging.exception("Too many violations")
+        raise RuntimeError
