@@ -155,7 +155,7 @@ def _copy_results(
     num_clients,
     output_dir
 ):
-    for fname in ["output.log", "_server-stats.csv", "_client-stats.csv"]:
+    for fname in ["output.log", "server-stats.csv", "client-stats.csv"]:
         cmd = _get_scp_cmd(
             fname,
             vm_name,
