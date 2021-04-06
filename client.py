@@ -203,8 +203,7 @@ if __name__ == "__main__":
         logging.info(f"CPU family {f}, model {m}")
 
     num_violations = 0
-    logging.info(f"Attempting with {flags.num_retries} retries")
-    while num_violations <= flags.num_retries:
+    while num_violations <= flags["num_retries"]:
         try:
             main(**flags)
             break
@@ -213,7 +212,7 @@ if __name__ == "__main__":
             if "latency" not in str(e):
                 raise
             else:
-                file_prefix = _normalize_file_prefix(flags.file_prefix)
+                file_prefix = _normalize_file_prefix(flags["file_prefix"])
                 df = pd.read_csv(f"{file_prefix}server-stats.csv")
 
                 df["step"] = df.index // 6
