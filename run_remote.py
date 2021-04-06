@@ -26,7 +26,8 @@ def main(
     start: int,
     stop: int,
     step: int,
-    output_dir: typing.Optional[str] = None
+    output_dir: typing.Optional[str] = None,
+    num_retries: typing.Optional[int] = 0
 ) -> None:
     output_dir = output_dir or "."
     credentials = service_account.Credentials.from_service_account_file(
@@ -52,7 +53,8 @@ def main(
             num_iterations=50000,
             num_clients=num_clients,
             latency_threshold=1.0,
-            queue_threshold=100000
+            queue_threshold=100000,
+            num_retries=num_retries
         )
         client_cmd = [f"--container-arg={i}" for i in client_cmd.split()]
         cmd = base_cmd + " ".join(client_cmd)
@@ -224,7 +226,8 @@ def _get_client_cmd(
     num_iterations,
     num_clients,
     latency_threshold,
-    queue_threshold
+    queue_threshold,
+    num_retries
 ):
     cmd = f"--url {ip_address}:8001 "
     cmd += "--model-name gwe2e --model-version 1 --sequence-id 1001 "
@@ -234,6 +237,7 @@ def _get_client_cmd(
     cmd += "--file-prefix /output/ --log-file /output/output.log --warm-up 10 "
     cmd += f"--latency-threshold {latency_threshold} "
     cmd += f"--queue-threshold-us {queue_threshold}"
+    cmd += f"--num-retries {num_retries}"
     return cmd
 
 
@@ -289,6 +293,12 @@ if __name__ == "__main__":
         type=str,
         default=None,
         help="where to write results to"
+    )
+    parser.add_argument(
+        "--num-retries",
+        type=int,
+        default=0,
+        help="Number of retry attempts"
     )
 
     flags = parser.parse_args()

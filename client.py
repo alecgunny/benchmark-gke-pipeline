@@ -221,6 +221,7 @@ if __name__ == "__main__":
 
                 if np.percentile(df.queue, 99) < 200:
                     num_violations += 1
+                    logging.warning("Queue times stable, retrying")
                     continue
                 else:
                     raise
