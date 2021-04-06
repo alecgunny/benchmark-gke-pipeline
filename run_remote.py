@@ -236,7 +236,7 @@ def _get_client_cmd(
     cmd += f"--num-clients {num_clients} "
     cmd += "--file-prefix /output/ --log-file /output/output.log --warm-up 10 "
     cmd += f"--latency-threshold {latency_threshold} "
-    cmd += f"--queue-threshold-us {queue_threshold}"
+    cmd += f"--queue-threshold-us {queue_threshold} "
     cmd += f"--num-retries {num_retries}"
     return cmd
 

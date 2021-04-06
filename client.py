@@ -197,11 +197,13 @@ if __name__ == "__main__":
 
     with open("/proc/cpuinfo", "r") as f:
         cpuinfo = f.read().split("\n")
-    cpuinfo = [i.split(": ")[1] for i in cpuinfo if i.startswith("model name")]
-    for p in cpuinfo:
-        logging.info(p)
+    families = [i.split(": ")[1] for i in cpuinfo if i.startswith("cpu family")]
+    models = [i.split(": ")[1] for i in cpuinfo if i.startswith("model\t")]
+    for f, m in zip(families, models):
+        logging.info(f"CPU family {f}, model {m}")
 
     num_violations = 0
+    logging.info(f"Attempting with {flags.num_retries} retries")
     while num_violations <= flags.num_retries:
         try:
             main(**flags)
@@ -228,6 +230,7 @@ if __name__ == "__main__":
                     raise
         except Exception:
             logging.exception("Fatal error")
+            raise
     else:
         logging.exception("Too many violations")
         raise RuntimeError
