@@ -47,6 +47,7 @@ def main(
     generation_rate = start
     num_clients = 1
     while True:
+        current_retries = 0
         client_cmd = _get_client_cmd(
             ip_address,
             generation_rate,
@@ -54,7 +55,7 @@ def main(
             num_clients=num_clients,
             latency_threshold=1.0,
             queue_threshold=100000,
-            num_retries=num_retries
+            num_retries=0
         )
         client_cmd = [f"--container-arg={i}" for i in client_cmd.split()]
         cmd = base_cmd + " ".join(client_cmd)
@@ -99,6 +100,21 @@ def main(
             cmd = _get_delete_cmd(vm_name, project)
             run_cmd(cmd, True)
 
+        prefix = "generation-rate={}_clients={}".format(
+            generation_rate, num_clients
+        )
+        fname = os.path.join(output_dir, prefix + "_output.log")
+        with open(fname, "r") as f:
+            log = f.read()
+            if "Queue times stable, retrying" in log:
+                current_retries += 1
+                if current_retries == num_retries:
+                    raise RuntimeError("Too many retries")
+                print("Retrying due to threading issue")
+                continue
+            else:
+                current_retries = 0
+
         if stop is not None:
             generation_rate += step
             if generation_rate >= stop:
@@ -122,6 +138,7 @@ def main(
 def _wait_for_container_completion(vm_name, project, ssh_key_file):
     container_started = False
     start_up_sleep = 60
+    total_wait_time = 300
     start_time = time.time()
     while True:
         try:
@@ -144,6 +161,8 @@ def _wait_for_container_completion(vm_name, project, ssh_key_file):
             else:
                 break
         else:
+            if time.time() - start_time > total_wait_time:
+                raise RuntimeError("Job taking too long, stopping")
             container_started = True
 
 

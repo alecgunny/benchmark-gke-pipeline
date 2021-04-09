@@ -9,7 +9,7 @@ RUN set -ex \
             attrs \
             google-cloud-storage \
             numpy \
-            nvidia-pyindex \
+            nvidia-pyindex==1.0.6 \
             pandas \
             requests \
             tblib \
