@@ -54,7 +54,7 @@ def read_frames(
             if not blob.name.endswith(".gwf"):
                 continue
 
-            blob_bytes = BytesIO(blob.download_as_bytes())
+            blob_bytes = GWFBytes(blob.download_as_bytes())
 
             timeseries = TimeSeriesDict.read(
                 blob_bytes, channels=channels, format="gwf"
@@ -191,12 +191,13 @@ H1:GDS-CALIB_KAPPA_PU_IMAGINARY_NOGATE
 H1:GDS-GATED_DQVECTOR
 """.split("\n")
 
+    class GWFBytes(BytesIO):
+        name="banana.gwf"
+
     import glob
-    credentials = service_account.Credentials.from_service_account_file(
-        glob.glob(r"C:\Users\amacg\Downloads\gunny*.json")[0]
-    )
     dg = GCPFrameDataGenerator(
-        glob.glob(r"C:\Users\amacg\Downloads\gunny*.json")[0],
+        "/home/alec.gunny/.ssh/gcp-service-account-key.json",
+        # glob.glob(r"C:\Users\amacg\Downloads\gunny*.json")[0],
         bucket_name="ligo-o2",
         sample_rate=1000,
         channels=[i for i in channels if i],

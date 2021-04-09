@@ -194,6 +194,9 @@ if __name__ == "__main__":
     log_file = flags.pop("log_file")
     if log_file is not None:
         logging.basicConfig(filename=log_file, level=logging.INFO)
+    else:
+        import sys
+        logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
     with open("/proc/cpuinfo", "r") as f:
         cpuinfo = f.read().split("\n")
