@@ -1,6 +1,6 @@
 #! /bin/bash -e
 
-while getopts "c:p:z:r:b:k:i:s:tdf" opt; do
+while getopts "c:p:z:r:b:k:i:s:tdfh" opt; do
     case ${opt} in
         c )
             cluster=${OPTARG}
@@ -18,7 +18,7 @@ while getopts "c:p:z:r:b:k:i:s:tdf" opt; do
             bucket=${OPTARG}
             ;;
         k )
-            kernel_stride=${OPTARG}
+            kernel_stride+=(${OPTARG})
             ;;
         i )
             instances=${OPTARG}
@@ -35,7 +35,7 @@ while getopts "c:p:z:r:b:k:i:s:tdf" opt; do
         f ) precision="fp16"
             ;;
         h )
-            echo "Create or delete a GKE cluster"
+            echo "Export end-to-end models for inference"
             echo "Options:"
             echo "--------"
             echo "    -c: cluster name for deploying TensorRT conversion app"
@@ -99,12 +99,17 @@ fi
 [[ -z $(ls $repo) ]] || rm -rf ${repo}/*
 
 # run the export script
-python export.py \
-    --repo-dir ${repo} \
-    --count ${instances:-1} \
-    --platform ${platform} \
-    --kernel-stride ${kernel_stride} \
-    --streams-per-gpu ${streams:-1}
+for k in ${kernel_stride[@]}; do
+    basename=""
+    [[ ${#kernel_stride[@]} > 1 ]] && basename="--base-name kernel-stride=${k}"
+    python export.py \
+        --repo-dir ${repo} \
+        --count ${instances:-1} \
+        --platform ${platform} \
+        --kernel-stride $k \
+        --streams-per-gpu ${streams:-1} \
+        ${basename}
+done
 
 # create the specified bucket if it doesn't exist
 [[ ! -z $(gsutil ls -p ${project} gs:// | grep gs://${bucket}) ]] || \
