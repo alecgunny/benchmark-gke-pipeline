@@ -75,4 +75,4 @@ python format_yaml.py apps/triton-server/deploy.yaml \
     --vcpus ${vcpus_per_deployment} \
     --repo ${bucket} \
     --name ${name} | kubectl apply -f -
-kubectl rollout status deployment/tritonserver
+kubectl rollout status deployment/${name}
