@@ -41,12 +41,14 @@ def main(
         "alecgunny/gw-client:latest",
         service_account_email,
         project,
-        16
+        32
     )
 
     generation_rate = start
     num_clients = 1
+    current_retries = 0
     while True:
+        # build and run the command that executes the job on GCP
         client_cmd = _get_client_cmd(
             ip_address,
             generation_rate,
@@ -54,11 +56,13 @@ def main(
             num_clients=num_clients,
             latency_threshold=1.0,
             queue_threshold=100000,
-            num_retries=num_retries
+            num_retries=0
         )
         client_cmd = [f"--container-arg={i}" for i in client_cmd.split()]
         cmd = base_cmd + " ".join(client_cmd)
         run_cmd(cmd, True)
+
+        # sleep for a bit to give it time to spin up
         time.sleep(10)
 
         try:
@@ -72,6 +76,8 @@ def main(
                 output_dir
             )
         except RuntimeError as e:
+            # if the container never started, try to pull
+            # pull a log file and see what happened
             try:
                 cmd = _get_scp_cmd(
                     "output.log",
@@ -84,20 +90,61 @@ def main(
                 )
                 run_cmd(cmd, True)
             except Exception:
+                # there was no log file, guess we're out of luck
                 pass
             else:
+                # read the file and print it to stdout, then get rid of it
                 prefix = "generation-rate={}_clients={}".format(
                     generation_rate, num_clients
                 )
                 fname = os.path.join(output_dir, prefix + "_output.log")
                 with open(fname, "r") as f:
-                    print(f.read())
+                    log = f.read()
+                    print(log)
                 os.remove(fname)
+
             finally:
+                if "[StatusCode.UNAVAILABLE] Too many pings" in log:
+                    # having inconsistent issues with connecting
+                    # to the server, so try this a couple times
+                    # before calling it quits
+                    current_retries += 1
+                    if current_retries < num_retries:
+                        continue
+                # otherwise raise the original error that
+                # got us here in the first place
                 raise e
         finally:
+            # delete the vm whether we succeeded or not
             cmd = _get_delete_cmd(vm_name, project)
             run_cmd(cmd, True)
+
+        # load in the log from the run and make sure
+        # we didn't run into any issues
+        prefix = "generation-rate={}_clients={}".format(
+            generation_rate, num_clients
+        )
+        fname = os.path.join(output_dir, prefix + "_output.log")
+        with open(fname, "r") as f:
+            log = f.read()
+
+        bad_messages = [
+            "Queue times stable, retrying",
+            "[StatusCode.UNAVAILABLE] Too many pings",
+            "[StatusCode.UNAVAILABLE] Broken pipe"
+        ]
+        try:
+            for msg in bad_messages:
+                if msg in log:
+                    raise RuntimeError(msg)
+            else:
+                current_retries = 0
+        except RuntimeError as e:
+            current_retries += 1
+            if current_retries == num_retries:
+                raise RuntimeError("Too many retries")
+            print("Retrying due to message: " + str(e))
+            continue
 
         if stop is not None:
             generation_rate += step
@@ -122,6 +169,7 @@ def main(
 def _wait_for_container_completion(vm_name, project, ssh_key_file):
     container_started = False
     start_up_sleep = 60
+    total_wait_time = 300
     start_time = time.time()
     while True:
         try:
@@ -144,6 +192,8 @@ def _wait_for_container_completion(vm_name, project, ssh_key_file):
             else:
                 break
         else:
+            if time.time() - start_time > total_wait_time:
+                raise RuntimeError("Job taking too long, stopping")
             container_started = True
 
 
@@ -217,6 +267,7 @@ def _get_base_cmd(
     cmd += f"--project {project} "
     cmd += "--container-mount-host-path=host-path=/home,mount-path=/output "
     cmd += "--container-restart-policy=never "
+    cmd += '--min-cpu-platform="Intel Skylake" '
     return cmd
 
 
