@@ -88,8 +88,8 @@ def main(
                 if isinstance(x, ExceptionWrapper):
                     x.reraise()
                 num_packages_received += 1
-                if num_packages_received == num_iterations:
-                    break
+            if num_packages_received >= num_iterations:
+                break
 
             num_equal_signs = num_packages_received * 25 // num_iterations
             num_spaces = 25 - num_equal_signs
