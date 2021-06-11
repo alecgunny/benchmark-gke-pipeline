@@ -10,7 +10,7 @@ import tritonclient.grpc as triton
 from stillwater import (
     DummyDataGenerator,
     MultiSourceGenerator,
-    ThreadedMultiStreamInferenceClient
+    StreamingInferenceClient
 )
 from stillwater.utils import ExceptionWrapper
 
@@ -36,7 +36,7 @@ def main(
     latency_threshold: float = 1.,
     queue_threshold_us: float = 100000
 ):
-    client = ThreadedMultiStreamInferenceClient(
+    client = StreamingInferenceClient(
         url=url,
         model_name=model_name,
         model_version=model_version,
